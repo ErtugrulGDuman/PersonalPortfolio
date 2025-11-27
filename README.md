@@ -3,7 +3,6 @@
 Bu proje, modern web teknolojileri kullanılarak geliştirilmiş, etkileşimli ve profesyonel bir kişisel portfolyo web sitesidir. Next.js 14, TypeScript ve Tailwind CSS ile güçlendirilmiş olup, Three.js ile zenginleştirilmiş 3D görsel deneyimler sunar.
 
 ![Project Preview](https://github.com/ErtugrulGDuman/PersonalPortfolio/assets/placeholder-image.png)
-*(Buraya projenizin ekran görüntüsünü ekleyebilirsiniz)*
 
 ## ✨ Özellikler
 
@@ -65,8 +64,8 @@ Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyi
 ## 📬 İletişim
 
 *   **LinkedIn:** [Ertuğrul Gökay Duman](https://www.linkedin.com/in/ertugrulgduman/)
-*   **E-posta:** [İletişim sayfasından ulaşabilirsiniz]
-*   **Web:** [Kişisel Siteniz]
+*   **E-posta:** [ertugrulgokayduman@gmail.com]
+*   **Web:** [ertugrulgokayduman.com]
 
 ---
 *Bu proje [Ertuğrul Gökay Duman](https://github.com/ErtugrulGDuman) tarafından geliştirilmiştir.*
