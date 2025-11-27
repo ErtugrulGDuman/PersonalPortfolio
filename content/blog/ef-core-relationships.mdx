@@ -1,0 +1,175 @@
+---
+title: "Entity Framework Core İle Veritabanı İlişkileri Nasıl Yönetilir?"
+date: "2024-11-22"
+description: "EF Core ile One-to-One, Many-to-One ve Many-to-Many ilişkilerin yönetimi ve Fluent API kullanımı."
+tags: ["Entity Framework Core", "Database", "Relationships", "ORM"]
+readTime: "5 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/entity-framework-core-i%CC%87le-veritaban%C4%B1-i%CC%87li%C5%9Fkileri-nas%C4%B1l-y%C3%B6netilir-4fa875b28737"
+---
+
+Entity Framework Core (EF Core), modern veritabanı uygulamalarını hızlı, aynı zamanda kolay bir şekilde geliştirmek için kullanılan, .NET platformunun güçlü bir Object-Relational Mapping (ORM- Nesne İlişkisel Haritalama, Eşleme) aracıdır. Veritabanı ile uygulama arasında bir köprü görevi gören EF Core, ilişkili veritabanı modellerini yönetme, veri sorgulama ve güncelleme işlemlerini basitleştirir. Bu yazıda, EF Core ile veritabanı ilişkilerini yönetmeyi detaylı bir şekilde ele alacağız. Özellikle çoktan bire (Many-to-One), çoktan çoğa (Many-to-Many) ve birden bire (One-to-One) ilişkileri örneklerle inceleyeceğiz.
+
+## 1. Entity Framework Core’da İlişkiler
+
+Bir veritabanında tablolar arasındaki ilişkiler genellikle üç farklı türde sınıflandırılır:
+*   **Birden Bire (One-to-One):** Bir kaydın yalnızca bir başka kayıtla ilişkili olduğu durumdur.
+*   **Çoktan Bire (Many-to-One):** Birden çok kaydın tek bir kayıtla ilişkili olduğu durumdur.
+*   **Çoktan Çoğa (Many-to-Many):** Birden çok kaydın birçok kayıtla ilişkili olduğu durumdur.
+
+EF Core, bu ilişkileri tanımlamak ve yönetmek için navigasyon özellikleri ve veri anotasyonları (Data Annotations) veya Fluent API kullanır.
+
+**Fluent Api Nedir:**
+Entity Framework (EF) Core ve diğer ORM araçlarında, veri modelinin yapılandırılmasını sağlamak için kullanılan bir programlama yöntemidir. Bu yöntem, sınıf ilişkilerini, özellikleri ve veritabanı yapılarını daha ayrıntılı bir şekilde tanımlamak için method chaining (metod zincirleme) yaklaşımını kullanır.
+
+## 2. Çoktan Bire (Many-to-One) İlişkisi
+
+Çoktan bire ilişkiler, genellikle en yaygın ilişki türüdür. Örneğin, bir siparişin (Order) bir müşteriye (Customer) ait olduğu bir senaryo düşünelim.
+
+**Veri Modelleri:**
+
+```csharp
+public class Customer
+{
+    public int CustomerId { get; set; }
+    public string Name { get; set; }
+
+    // Navigation Property
+    public ICollection<Order> Orders { get; set; }
+}
+
+public class Order
+{
+    public int OrderId { get; set; }
+    public DateTime OrderDate { get; set; }
+    public int CustomerId { get; set; }
+
+    // Navigation Property
+    public Customer Customer { get; set; }
+}
+```
+
+**Fluent API ile Tanımlama:**
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Order>()
+        .HasOne(o => o.Customer)
+        .WithMany(c => c.Orders)
+        .HasForeignKey(o => o.CustomerId);
+}
+```
+
+## 3. Birden Bire (One-to-One) İlişkisi
+
+Birden bire ilişkiler, her iki tablonun yalnızca birbiriyle eşleştiği durumları temsil eder. Örneğin, bir kullanıcının yalnızca bir profili olabilir.
+
+**Veri Modelleri:**
+
+```csharp
+public class User
+{
+    public int UserId { get; set; }
+    public string Username { get; set; }
+
+    // Navigation Property
+    public UserProfile UserProfile { get; set; }
+}
+
+public class UserProfile
+{
+    public int UserProfileId { get; set; }
+    public string Address { get; set; }
+
+    // Foreign Key
+    public int UserId { get; set; }
+
+    // Navigation Property
+    public User User { get; set; }
+}
+```
+
+**Fluent API ile Tanımlama:**
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<User>()
+        .HasOne(u => u.UserProfile)
+        .WithOne(up => up.User)
+        .HasForeignKey<UserProfile>(up => up.UserId);
+}
+```
+
+## 4. Çoktan Çoğa (Many-to-Many) İlişkisi
+
+EF Core 5.0 ve üstü sürümlerde, çoktan çoğa ilişkiler için ara tablo (junction table) otomatik olarak oluşturulabilir. Örneğin, öğrenciler (Student) ve kurslar (Course) arasında bir ilişkiyi ele alalım.
+
+**Veri Modelleri:**
+
+```csharp
+public class Student
+{
+    public int StudentId { get; set; }
+    public string Name { get; set; }
+
+    // Navigation Property
+    public ICollection<Course> Courses { get; set; }
+}
+
+public class Course
+{
+    public int CourseId { get; set; }
+    public string Title { get; set; }
+
+    // Navigation Property
+    public ICollection<Student> Students { get; set; }
+}
+```
+
+**Fluent API ile Tanımlama (Opsiyonel):**
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Student>()
+        .HasMany(s => s.Courses)
+        .WithMany(c => c.Students)
+        .UsingEntity<Dictionary<string, object>>(
+            "StudentCourse",
+            j => j.HasOne<Course>().WithMany().HasForeignKey("CourseId"),
+            j => j.HasOne<Student>().WithMany().HasForeignKey("StudentId")
+        );
+}
+```
+
+## 5. Veri Çekme ve İşleme
+
+EF Core, ilişkili verilerle çalışmayı kolaylaştırır.
+
+*   **Lazy Loading:** İlişkili verileri yalnızca gerektiğinde yükler.
+    ```csharp
+    var customer = context.Customers.Find(1);
+    var orders = customer.Orders; // Orders burada yüklenir.
+    ```
+*   **Eager Loading:** İlişkili verileri sorgu sırasında yükler.
+    ```csharp
+    var customers = context.Customers.Include(c => c.Orders).ToList();
+    ```
+*   **Explicit Loading:** İlişkili verileri manuel olarak yükler.
+    ```csharp
+    var customer = context.Customers.Find(1);
+    context.Entry(customer).Collection(c => c.Orders).Load();
+    ```
+
+## 6. Performans İpuçları
+
+*   **Projection Kullanımı:** Yalnızca ihtiyaç duyulan alanları seçin.
+*   **AsNoTracking:** Sadece okuma işlemleri için kullanın.
+*   **Transaction Yönetimi:** Birden fazla işlemi tek bir transaction içinde yönetin.
+
+## Sonuç
+
+Entity Framework Core, ilişkili veritabanı modellerini yönetmek için güçlü araçlar sunar. Çoktan bire, birden bire ve çoktan çoğa ilişkileri hem veri anotasyonları hem de Fluent API kullanarak tanımlayabilir, verilerinizi verimli bir şekilde işleyebilirsiniz.
+
+

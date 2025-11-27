@@ -1,0 +1,206 @@
+---
+title: "REST API Nedir ve ASP.NET Core’da RESTful API Geliştirme"
+date: "2024-12-01"
+description: "REST API kavramı, prensipleri ve ASP.NET Core ile RESTful API geliştirme örneği."
+tags: ["REST API", "ASP.NET Core", "Web API", "CRUD"]
+readTime: "5 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/rest-api-nedir-ve-asp-net-coreda-restful-api-geli%C5%9Ftirme-905354ff4392"
+---
+
+REST API (Representational State Transfer — Temsili Durum Transferi), günümüz yazılım dünyasında web servislerinin geliştirilmesi için en yaygın kullanılan mimari yaklaşımlardan biridir. Modern web ve mobil uygulamaların temel yapı taşlarından biri olan REST API’ler, sunucu ile istemci arasındaki veri iletişimini standartlaştırır ve kolaylaştırır.
+
+Bu yazıda, REST API’nin temel kavramlarını, RESTful prensiplerini ve ASP.NET Core ile bir RESTful API’nin nasıl geliştirileceğini ele alacağız. Ayrıca C# kod örnekleriyle bir CRUD (Create, Read, Update, Delete) API oluşturacağız.
+
+## 1. REST API Nedir?
+
+REST, 2000 yılında Roy Fielding tarafından önerilen bir mimari tarzdır. REST API’ler, istemci ve sunucu arasındaki veri alışverişini standart hale getiren kurallar setine dayanır. Bu kurallar, web servislerinin daha esnek, ölçeklenebilir ve kolay anlaşılır olmasını sağlar.
+
+**REST API’nin Temel Özellikleri:**
+*   **Kaynak Odaklıdır:** Her şey bir kaynak (resource) olarak ele alınır. Örneğin, bir kullanıcı, ürün veya sipariş bir kaynaktır.
+*   **HTTP Yöntemlerini Kullanır:**
+    *   `GET`: Veri almak için
+    *   `POST`: Yeni veri oluşturmak için
+    *   `PUT`: Var olan veriyi güncellemek için
+    *   `DELETE`: Veri silmek için
+*   **Stateless (Durumsuz) Olmalıdır:** Sunucu, istemci hakkında herhangi bir bilgi saklamaz. Her istek bağımsızdır.
+*   **URI Yapısı Basit ve Anlamlıdır:** Kaynaklar açık URI’lar ile erişilebilir olmalıdır (örn: `/api/users/1`).
+
+## 2. ASP.NET Core ile RESTful API Geliştirme
+
+ASP.NET Core, RESTful API geliştirmek için güçlü ve esnek bir framework sağlar. Şimdi, örnek bir RESTful API geliştirelim.
+
+## 3. CRUD API Örneği: Kullanıcı Yönetimi
+
+### Adım 1: Yeni Bir ASP.NET Core Web API Projesi Oluşturma
+
+Visual Studio veya CLI kullanarak bir ASP.NET Core Web API projesi oluşturun:
+
+```bash
+dotnet new webapi -n UserManagementApi
+```
+
+### Adım 2: Veri Modelini Tanımlama
+
+Bir `User` sınıfı oluşturalım:
+
+```csharp
+public class User
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+}
+```
+
+### Adım 3: Veri Deposu (Repository) Oluşturma
+
+Veriyi geçici olarak saklamak için bir repository oluşturalım:
+
+```csharp
+public interface IUserRepository
+{
+    IEnumerable<User> GetAllUsers();
+    User GetUserById(int id);
+    void AddUser(User user);
+    void UpdateUser(User user);
+    void DeleteUser(int id);
+}
+
+public class UserRepository : IUserRepository
+{
+    private readonly List<User> _users = new();
+
+    public IEnumerable<User> GetAllUsers() => _users;
+
+    public User GetUserById(int id) => _users.FirstOrDefault(u => u.Id == id);
+
+    public void AddUser(User user)
+    {
+        user.Id = _users.Count > 0 ? _users.Max(u => u.Id) + 1 : 1;
+        _users.Add(user);
+    }
+
+    public void UpdateUser(User user)
+    {
+        var existingUser = GetUserById(user.Id);
+        if (existingUser != null)
+        {
+            existingUser.Name = user.Name;
+            existingUser.Email = user.Email;
+        }
+    }
+
+    public void DeleteUser(int id) => _users.RemoveAll(u => u.Id == id);
+}
+```
+
+### Adım 4: Bağımlılıkları Kaydetme
+
+`Program.cs` dosyasına aşağıdaki kodu ekleyerek repository’yi kaydedin:
+
+```csharp
+builder.Services.AddSingleton<IUserRepository, UserRepository>();
+```
+
+### Adım 5: Kullanıcı API’si için Controller Oluşturma
+
+Bir `UsersController` oluşturalım:
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
+{
+    private readonly IUserRepository _userRepository;
+
+    public UsersController(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    [HttpGet]
+    public IActionResult GetAllUsers()
+    {
+        var users = _userRepository.GetAllUsers();
+        return Ok(users);
+    }
+
+    [HttpGet("{id}")]
+    public IActionResult GetUserById(int id)
+    {
+        var user = _userRepository.GetUserById(id);
+        if (user == null)
+            return NotFound();
+        return Ok(user);
+    }
+
+    [HttpPost]
+    public IActionResult AddUser([FromBody] User user)
+    {
+        _userRepository.AddUser(user);
+        return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
+    }
+
+    [HttpPut("{id}")]
+    public IActionResult UpdateUser(int id, [FromBody] User user)
+    {
+        if (id != user.Id)
+            return BadRequest();
+
+        var existingUser = _userRepository.GetUserById(id);
+        if (existingUser == null)
+            return NotFound();
+
+        _userRepository.UpdateUser(user);
+        return NoContent();
+    }
+
+    [HttpDelete("{id}")]
+    public IActionResult DeleteUser(int id)
+    {
+        var user = _userRepository.GetUserById(id);
+        if (user == null)
+            return NotFound();
+
+        _userRepository.DeleteUser(id);
+        return NoContent();
+    }
+}
+```
+
+## 4. RESTful API Testi
+
+### .NET 9 ve OpenAPI
+
+.NET 9 ile birlikte, RESTful API’lerin dokümantasyonu için OpenAPI desteği daha da geliştirildi. Swagger UI varsayılan olarak sunulmaya devam ederken, OpenAPI sayesinde API dokümantasyonları daha esnek ve özelleştirilebilir hale geldi.
+
+Uygulamanızı çalıştırdıktan sonra Swagger UI’ye `https://localhost:5001/swagger` adresinden erişebilir ve API’nizi kolayca test edebilirsiniz.
+
+**Örnek İstekler:**
+*   `GET /api/users`: Tüm kullanıcıları getirir.
+*   `POST /api/users`: Yeni bir kullanıcı ekler.
+*   `PUT /api/users/1`: Mevcut bir kullanıcıyı günceller.
+*   `DELETE /api/users/1`: Belirtilen kullanıcıyı siler.
+
+## 5. RESTful API’nin Avantajları
+
+*   **Platform Bağımsızlığı:** REST API’ler, platformdan bağımsız olarak kullanılabilir.
+*   **Stateless Mimari (Durumsuzluk):** Her istek bağımsızdır ve istemci hakkında herhangi bir bilgi saklanmaz.
+*   **Kolay Entegrasyon:** Farklı teknolojilerle kolayca entegre edilebilir.
+*   **Ölçeklenebilirlik:** Yatay olarak kolayca ölçeklenebilir.
+*   **Basitlik ve Hafiflik:** JSON gibi hafif veri formatları kullanır.
+*   **Kolay Öğrenim ve Uygulama:** HTTP protokolüne dayanır.
+*   **Statik Bellek Kullanımı (Caching):** GET istekleri önbelleğe alınabilir.
+*   **Güçlü Güvenlik Desteği:** HTTPS, OAuth, JWT gibi yöntemlerle güvenliği artırır.
+*   **Geliştirici Deneyimi:** Swagger gibi araçlarla kolayca belgelenebilir.
+*   **Esnek Veri Sunumu:** Farklı istemcilere farklı şekillerde sunulabilir.
+*   **Zamanla Evrimleşme Yeteneği:** Versiyonlama ile geriye dönük uyumluluk korunabilir.
+*   **Global Standartlara Uygunluk:** HTTP standartlarına dayanır.
+*   **Bağımsız Kaynaklar:** Kaynaklar URI ile temsil edilir.
+*   **Yüksek Performans:** Veri alışverişini hızlandırır.
+
+## 6. Sonuç
+
+Bu yazıda, REST API’nin temel kavramlarını ve ASP.NET Core ile bir RESTful API’nin nasıl geliştirileceğini öğrendik. CRUD işlemlerini gerçekleştiren bir kullanıcı yönetimi API’si oluşturarak RESTful API geliştirme sürecini adım adım inceledik.
+
+

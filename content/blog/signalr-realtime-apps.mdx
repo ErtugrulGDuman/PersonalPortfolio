@@ -1,0 +1,175 @@
+---
+title: "SignalR ile Gerçek Zamanlı Uygulamalar Nasıl Yapılır?"
+date: "2024-12-14"
+description: "SignalR nedir, çalışma prensibi, avantajları ve ASP.NET Core ile gerçek zamanlı chat uygulaması geliştirme adımları."
+tags: ["SignalR", "ASP.NET Core", "Real-time", "WebSockets"]
+readTime: "6 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/signalr-ile-ger%C3%A7ek-zamanl%C4%B1-uygulamalar-nas%C4%B1l-yap%C4%B1l%C4%B1r-e8d090b1c6f0"
+---
+
+Gerçek zamanlı (real-time) iletişim, modern web ve mobil uygulamalarının temel gereksinimlerinden biridir. Kullanıcıların anlık veri almasını ve göndermesini gerektiren chat uygulamaları, bildirim sistemleri ve dashboard’lar gibi birçok senaryoda bu iletişim büyük bir öneme sahiptir. ASP.NET Core SignalR, bu gereksinimi kolayca karşılamak için geliştirilmiş güçlü bir kütüphanedir. Bu yazıda, SignalR kavramını, temel çalışma prensiplerini ve ASP.NET Core ile nasıl kullanılacağını detaylı bir şekilde inceleyeceğiz. Ayrıca, C# ile SignalR kullanarak bir gerçek zamanlı chat uygulamasını adım adım geliştirmiş olacağız.
+
+## 1. SignalR Nedir?
+
+SignalR, ASP.NET Core için geliştirilmiş bir kütüphane olup, gerçek zamanlı web işlevselliğini kolayca uygulamanızı sağlar. SignalR, bize istemci ve sunucu arasındaki iki yönlü iletişim için gerekli altyapıyı sağlar.
+
+**SignalR’nin Sağladığı Avantajlar:**
+*   **Gerçek Zamanlı İletişim:** Sunucu ile istemci arasında anlık veri alışverişi yapılabilir.
+*   **WebSocket Desteği:** Performansı artırmak için en hızlı iletişim protokolü olan WebSocket’i kullanır.
+*   **Farklı Protokol Destekleri:** WebSocket desteklenmeyen tarayıcılar için Long Polling ve Server-Sent Events gibi alternatifler sunar.
+*   **Basitleştirilmiş API:** Karmaşık protokol yönetimi yerine, kolay bir API ile gerçek zamanlı özellikler eklenebilir.
+
+## 2. SignalR’nin Çalışma Prensibi
+
+SignalR, istemci ve sunucu arasındaki iki yönlü iletişimi yönetir. SignalR ile şunlar yapılabilir:
+*   Sunucudan istemciye veri göndermek.
+*   İstemciden sunucuya veri göndermek.
+*   Grup tabanlı iletişim sağlamak (örneğin, belirli bir kullanıcı grubu için mesajlar).
+
+## 3. SignalR ile Chat Uygulaması Geliştirme
+
+### Adım 1: Yeni Bir ASP.NET Core Web API Projesi Oluşturun
+
+```bash
+dotnet new webapi -n SignalRChatApp
+```
+
+### Adım 2: Gerekli NuGet Paketlerini Yükleyin
+
+```bash
+dotnet add package Microsoft.AspNetCore.SignalR
+dotnet add package Microsoft.AspNetCore.SignalR.Client
+```
+
+### Adım 3: SignalR Hub’ı Oluşturun
+
+SignalR, iletişim için bir Hub kullanır. Bir chat uygulaması için aşağıdaki gibi bir ChatHub oluşturun:
+
+```csharp
+using Microsoft.AspNetCore.SignalR;
+
+public class ChatHub : Hub
+{
+    public async Task SendMessage(string user, string message)
+    {
+        // Tüm istemcilere mesaj gönderir
+        await Clients.All.SendAsync("ReceiveMessage", user, message);
+    }
+}
+```
+
+### Adım 4: SignalR’yi Konfigüre Edin
+
+`Program.cs` dosyasını SignalR destekleyecek şekilde yapılandırın:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+builder.Services.AddSignalR();
+
+app.MapHub<ChatHub>("/chatHub"); // ChatHub'ı endpoint olarak tanımlıyoruz
+
+app.UseHttpsRedirection();
+
+app.Run();
+```
+
+### Adım 5: İstemci Tarafı Kurulumu
+
+Bir HTML dosyası oluşturarak istemci tarafını hazırlayın ve SignalR istemci kütüphanesini dahil edin:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignalR Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.12/signalr.min.js"></script>
+</head>
+<body>
+    <h1>SignalR Chat</h1>
+    <input type="text" id="username" placeholder="Kullanıcı Adı">
+    <input type="text" id="message" placeholder="Mesaj">
+    <button onclick="sendMessage()">Gönder</button>
+    <ul id="messagesList"></ul>
+
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/chatHub")
+            .build();
+
+        connection.on("ReceiveMessage", (user, message) => {
+            const li = document.createElement("li");
+            li.textContent = `${user}: ${message}`;
+            document.getElementById("messagesList").appendChild(li);
+        });
+
+        connection.start().catch(err => console.error(err));
+
+        function sendMessage() {
+            const user = document.getElementById("username").value;
+            const message = document.getElementById("message").value;
+            connection.invoke("SendMessage", user, message).catch(err => console.error(err));
+        }
+    </script>
+</body>
+</html>
+```
+
+## 4. SignalR’nin Gelişmiş Kullanımları
+
+### 1. Grup İletişimi
+
+Belirli gruplara mesaj göndermek için Groups özelliğini kullanabilirsiniz:
+
+```csharp
+public class ChatHub : Hub
+{
+    public async Task JoinGroup(string groupName)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+    }
+
+    public async Task SendMessageToGroup(string groupName, string message)
+    {
+        await Clients.Group(groupName).SendAsync("ReceiveGroupMessage", message);
+    }
+}
+```
+
+### 2. Belirli Kullanıcılara Mesaj Göndermek
+
+Belirli bir kullanıcıya mesaj göndermek için `Clients.User` kullanılabilir:
+
+```csharp
+public async Task SendMessageToUser(string userId, string message)
+{
+    await Clients.User(userId).SendAsync("ReceiveMessage", message);
+}
+```
+
+### 3. Bağlantı Yönetimi
+
+Bağlantılar üzerinde kontrol sağlamak için `OnConnectedAsync` ve `OnDisconnectedAsync` metodlarını override edebilirsiniz:
+
+```csharp
+public override async Task OnConnectedAsync()
+{
+    await base.OnConnectedAsync();
+    Console.WriteLine($"{Context.ConnectionId} bağlandı.");
+}
+
+public override async Task OnDisconnectedAsync(Exception? exception)
+{
+    await base.OnDisconnectedAsync(exception);
+    Console.WriteLine($"{Context.ConnectionId} bağlantısı kesildi.");
+}
+```
+
+## 5. Sonuç
+
+SignalR, ASP.NET Core’un güçlü özelliklerinden biridir ve gerçek zamanlı uygulama ihtiyaçlarınızı karşılamak için kolayca entegre edilebilir bir çözüm sunar. Bu yazıda, SignalR’yi kullanarak bir chat uygulaması oluşturduk ve SignalR’nin gruplar, kullanıcı bazlı iletişim ve bağlantı yönetimi gibi gelişmiş özelliklerini inceledik.
+
+

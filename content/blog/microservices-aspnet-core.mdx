@@ -1,0 +1,179 @@
+---
+title: "Microservices Mimarisi Nedir ve ASP.NET Core ile Geliştirme"
+date: "2025-01-23"
+description: "Microservices mimarisi kavramı, avantajları, temel prensipleri ve ASP.NET Core ile örnek uygulama geliştirme."
+tags: ["Microservices", "ASP.NET Core", "Architecture", "Backend"]
+readTime: "4 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/microservices-mimarisi-nedir-ve-asp-net-core-ile-geli%C5%9Ftirme-78f8f00b7d75"
+---
+
+Modern yazılım geliştirme dünyasında, özellikle büyük ve karmaşık projelerde, esneklik, ölçeklenebilirlik ve hızlı geliştirme ihtiyaçları her zamankinden daha önemli hale geldi. İşte bu noktada Microservices (Mikroservisler) mimarisi devreye giriyor. Mikroservisler, bir uygulamanın, bağımsız olarak geliştirilip dağıtılabilen küçük ve özel işlevlere sahip hizmetlerden oluştuğu bir mimari yaklaşımdır. Bu yazıda, Microservices Mimarisi kavramını, bu mimarinin avantajlarını, temel prensiplerini ve ASP.NET Core kullanarak mikroservislerin nasıl geliştirileceğini detaylı bir şekilde ele alacağız. Ayrıca, örnek bir uygulama ile mikroservis geliştirme sürecini görmüş olacağız.
+
+## 1. Microservices Mimarisi Nedir?
+
+Microservices Mimarisi, bir uygulamanın işlevsel olarak birbirinden bağımsız, küçük ve odaklanmış hizmetlerden (mikro-servis’lerden) oluştuğu bir yazılım geliştirme mimarisi, yaklaşımıdır. Bu mimaride her bir mikroservis, belirli bir işlevi yerine getirir ve diğer servislerden bağımsız olarak geliştirilip dağıtılabilir, farklı yerlerde, ortamlarda kullanılabilir.
+
+Monolitik mimariden temel farkı, mikroservislerin bağımsız yapıya sahip olmasıdır. Monolitik mimaride tüm işlevler tek bir kod tabanında toplanır ve dağıtım tek bir yapı üzerinden gerçekleştirilir. Buna karşılık, mikroservislerde her servis kendi kod tabanına sahiptir ve ayrı ayrı dağıtılabilir. Bu, büyük projelerde daha fazla esneklik, sürdürülebilirlik ve ölçeklenebilirlik sağlar.
+
+Mikroservisler, modüler yapısı sayesinde farklı teknolojiler kullanma imkanı tanır. Örneğin, bir servis .NET Core ile geliştirilebilirken, başka bir servis Node.js ile yazılabilir. Ayrıca, her servis kendi veritabanına sahip olduğundan, veri bağımsızlığı sağlanır ve bir servis üzerinde yapılan değişikliklerin diğerlerini etkilemesinin önüne geçilir.
+
+Özetle, Microservices Mimarisi, karmaşık sistemleri daha kolay yönetilebilir parçalara bölerek, esnek, ölçeklenebilir ve bağımsız bir geliştirme ortamı sağlar. Bu da modern yazılım geliştirme süreçlerinde sıkça tercih edilmesinin ana nedenlerinden biridir.
+
+## 2. Microservices Mimarisi’nin Avantajları
+
+*   **Ölçeklenebilirlik:** Her servis bağımsız olarak ölçeklenebilir, bu da kaynakların daha verimli kullanılmasını sağlar.
+*   **Hızlı Geliştirme:** Küçük ekipler, farklı servisler üzerinde aynı anda çalışabilir.
+*   **Hata İzolasyonu:** Bir servis çökerse, diğerleri etkilenmez.
+*   **Bağımsız Dağıtım:** Her servis bağımsız olarak dağıtılabilir ve güncellenebilir.
+*   **Farklı Teknolojiler Kullanımı:** Her mikroservis, ihtiyacına uygun farklı teknolojilerle geliştirilebilir.
+
+## 3. Microservices Geliştirme için Temel Prensipler
+
+*   **Bağımsız Servisler:** Her servis, bağımsız olarak geliştirilir, test edilir ve dağıtılır.
+*   **Veri Bağımsızlığı:** Her servis kendi veritabanına sahip olmalıdır.
+*   **API Tabanlı İletişim:** Mikroservisler arası iletişim REST, gRPC veya Message Queue gibi teknolojilerle sağlanır.
+*   **Dağıtılmış Sistemler:** Mikroservisler, farklı sunucular veya bulut ortamında çalışabilir.
+
+## 4. ASP.NET Core ile Microservices Geliştirme
+
+### Adım 1: Proje Yapısını Oluşturma
+
+Örnek olarak bir E-Ticaret Mikroservis Uygulaması geliştireceğiz. Proje yapımız şu şekilde olacak:
+
+```text
+ECommerceMicroservices
+├── ProductService (Ürün servisi)
+│   ├── Controllers
+│   ├── Models
+│   ├── Data
+│   └── ProductService.csproj
+├── OrderService (Sipariş servisi)
+│   ├── Controllers
+│   ├── Models
+│   ├── Data
+│   └── OrderService.csproj
+├── ApiGateway (API geçidi)
+│   └── ApiGateway.csproj
+└── docker-compose.yml
+```
+
+### Adım 2: ProductService Oluşturma
+
+ProductService.csproj dosyasını oluşturun:
+
+```bash
+dotnet new webapi -n ProductService
+cd ProductService
+```
+
+ProductController ile temel CRUD işlemleri yapalım:
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+namespace ProductService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ProductsController : ControllerBase
+    {
+        private static List<Product> _products = new List<Product>
+        {
+            new Product { Id = 1, Name = "Laptop", Price = 1000 },
+            new Product { Id = 2, Name = "Phone", Price = 500 }
+        };
+
+        [HttpGet]
+        public IActionResult GetProducts() => Ok(_products);
+
+        [HttpPost]
+        public IActionResult AddProduct([FromBody] Product product)
+        {
+            _products.Add(product);
+            return CreatedAtAction(nameof(GetProducts), product);
+        }
+    }
+
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+    }
+}
+```
+
+### Adım 3: OrderService Oluşturma
+
+Sipariş işlemleri için benzer bir yapı oluşturun:
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+namespace OrderService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class OrdersController : ControllerBase
+    {
+        private static List<Order> _orders = new List<Order>();
+
+        [HttpPost]
+        public IActionResult CreateOrder([FromBody] Order order)
+        {
+            _orders.Add(order);
+            return Ok("Sipariş alındı!");
+        }
+
+        public class Order
+        {
+            public int Id { get; set; }
+            public int ProductId { get; set; }
+            public int Quantity { get; set; }
+        }
+    }
+}
+```
+
+### Adım 4: API Gateway ile Mikroservisleri Birleştirme
+
+API Gateway, mikroservislerin birleştirilip dış dünyaya sunulmasını sağlar. Ocelot kütüphanesini kullanabilirsiniz.
+
+1.  Ocelot’u ekleyin:
+    ```bash
+    dotnet add package Ocelot
+    ```
+
+2.  `ocelot.json` yapılandırması:
+
+```json
+{
+  "Routes": [
+    {
+      "DownstreamPathTemplate": "/api/products",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5001 }],
+      "UpstreamPathTemplate": "/products",
+      "UpstreamHttpMethod": [ "GET", "POST" ]
+    },
+    {
+      "DownstreamPathTemplate": "/api/orders",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [{ "Host": "localhost", "Port": 5002 }],
+      "UpstreamPathTemplate": "/orders",
+      "UpstreamHttpMethod": [ "POST" ]
+    }
+  ],
+  "GlobalConfiguration": {
+    "BaseUrl": "http://localhost:5000"
+  }
+}
+```
+
+## 5. Sonuç
+
+Bu yazıda, Microservices Mimarisi’nin ne olduğunu, avantajlarını ve temel prensiplerini inceledik. Ayrıca, ASP.NET Core ile bir mikroservis yapısını nasıl geliştirebileceğinizi kod örnekleri ile birlikte gösterdik.
+
+Microservices, modern yazılım projelerinde esneklik ve ölçeklenebilirlik sağlamak için güçlü bir mimari yaklaşımdır.
+
+

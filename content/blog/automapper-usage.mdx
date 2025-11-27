@@ -1,0 +1,195 @@
+---
+title: "Automapper Kullanımı ile Nesneler Arası Dönüşüm"
+date: "2025-01-03"
+description: "AutoMapper kütüphanesi, nesne dönüşümü avantajları, kurulumu ve ASP.NET Core projelerinde pratik kullanımı."
+tags: ["AutoMapper", "ASP.NET Core", "C#", "DTO"]
+readTime: "5 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/automapper-kullan%C4%B1m%C4%B1-ile-nesneler-aras%C4%B1-d%C3%B6n%C3%BC%C5%9F%C3%BCm-58ff722c975c"
+---
+
+Nesneler arası dönüşüm, modern yazılım projelerinde sıkça ihtiyaç duyulan bir işlemdir. Farklı katmanlar arasında veri aktarımı yapılırken, bir nesnenin başka bir nesneye dönüştürülmesi gerekliliği ortaya çıkar. Bu tür dönüşümler manuel olarak yapıldığında zaman alıcı, hata yapmaya açıktır ve kodun karmaşıklığını artıran bir süreç doğurabilir. İşte bu noktada AutoMapper devreye girer. Bu yazıda, AutoMapper kütüphanesini, temel kullanım senaryolarını ve ASP.NET Core projelerinde nasıl uygulanacağını detaylı bir şekilde ele alacağız. Ayrıca, C# kod örnekleriyle pratik kullanımını göstereceğiz.
+
+## 1. AutoMapper Nedir?
+
+AutoMapper, bir nesnenin başka bir nesneye kolayca ve hızlı bir şekilde dönüştürülmesini sağlayan bir C# kütüphanesidir. Özellikle DTO (Data Transfer Object) sınıflarının domain modellerine veya tam tersine dönüştürülmesinde yaygın olarak kullanılır.
+
+**AutoMapper’ın Avantajları:**
+*   **Kod Tekrarını Azaltır:** Dönüşüm işlemleri için tekrar eden kod yazma ihtiyacını ortadan kaldırır. Zaman tasarrufu sağlar.
+*   **Kolay Yönetim:** Dönüşüm mantığı merkezi bir yerde tanımlanır, bu da yönetimi kolaylaştırır.
+*   **Hızlı Geliştirme:** Karmaşık dönüşüm işlemlerini basitleştirerek geliştirme sürecini hızlandırır.
+*   **Okunabilirlik:** Kodun okunabilirliğini ve bakımını artırır.
+
+## 2. AutoMapper Nasıl Kurulur?
+
+### Adım 1: NuGet Paketi Kurulumu
+
+AutoMapper kütüphanesini projeye eklemek için şu komutu kullanabilirsiniz:
+
+```bash
+dotnet add package AutoMapper.Extensions.Microsoft.DependencyInjection
+```
+
+## 3. AutoMapper Kullanımı
+
+### Senaryo: Kullanıcı Verilerinin Dönüştürülmesi
+
+### Adım 1: Model ve DTO Oluşturma
+
+Önce domain modeli ve DTO sınıflarını tanımlayalım:
+
+```csharp
+namespace MyApp.Core.Models
+{
+    public class User
+    {
+        public int Id { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string Email { get; set; }
+    }
+}
+
+namespace MyApp.Core.DTOs
+{
+    public class UserDto
+    {
+        public string FullName { get; set; }
+        public string Email { get; set; }
+    }
+}
+```
+
+### Adım 2: Mapping Profilini Tanımlama
+
+Mapping profilleri, AutoMapper’ın dönüşüm işlemini nasıl yapacağını tanımladığımız yerdir.
+
+```csharp
+using AutoMapper;
+using MyApp.Core.Models;
+using MyApp.Core.DTOs;
+
+namespace MyApp.Application.Mappings
+{
+    public class UserProfile : Profile
+    {
+        public UserProfile()
+        {
+            CreateMap<User, UserDto>()
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}"));
+        }
+    }
+}
+```
+
+### Adım 3: AutoMapper’ı Konfigüre Etme
+
+`Program.cs` dosyasında AutoMapper’ı yapılandırın:
+
+```csharp
+using AutoMapper;
+using MyApp.Application.Mappings;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAutoMapper(typeof(UserProfile)); // Mapping profilini ekliyoruz
+
+var app = builder.Build();
+
+app.MapControllers();
+
+app.Run();
+```
+
+### Adım 4: Controller’da Kullanım
+
+AutoMapper’ı bir controller’da kullanarak User nesnesini UserDto nesnesine dönüştürelim:
+
+```csharp
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
+using MyApp.Core.Models;
+using MyApp.Core.DTOs;
+
+namespace MyApp.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class UsersController : ControllerBase
+    {
+        private readonly IMapper _mapper;
+
+        public UsersController(IMapper mapper)
+        {
+            _mapper = mapper;
+        }
+
+        [HttpGet]
+        public IActionResult GetUser()
+        {
+            var user = new User
+            {
+                Id = 1,
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john.doe@example.com"
+            };
+
+            var userDto = _mapper.Map<UserDto>(user);
+
+            return Ok(userDto);
+        }
+    }
+}
+```
+
+## 4. Gelişmiş AutoMapper Kullanımı
+
+### 1. Ters Yönlü Dönüşüm
+
+AutoMapper, dönüşümleri çift yönlü olarak da yapabilir:
+
+```csharp
+CreateMap<User, UserDto>().ReverseMap();
+```
+
+### 2. Koleksiyon Dönüşümleri
+
+AutoMapper, koleksiyonları kolayca dönüştürebilir:
+
+```csharp
+var users = new List<User>
+{
+    new User { Id = 1, FirstName = "John", LastName = "Doe", Email = "john.doe@example.com" },
+    new User { Id = 2, FirstName = "Jane", LastName = "Smith", Email = "jane.smith@example.com" }
+};
+
+var userDtos = _mapper.Map<List<UserDto>>(users);
+```
+
+### 3. Koşullu Dönüşüm
+
+Belirli koşullara göre dönüşüm yapmak için:
+
+```csharp
+CreateMap<User, UserDto>()
+    .ForMember(dest => dest.Email, opt => opt.Condition(src => !string.IsNullOrEmpty(src.Email)));
+```
+
+## 5. AutoMapper’ın Avantajları
+
+1.  **Hızlı ve Kolay Kullanım:** AutoMapper, birkaç basit ayar ile karmaşık dönüşüm işlemlerini gerçekleştirebilir.
+2.  **Kod Tekrarını Azaltır:** Manuel dönüşüm işlemleri, projelerde kod tekrarına neden olur. AutoMapper bunu ortadan kaldırır.
+3.  **Merkezi Yönetim:** Dönüşüm kuralları, AutoMapper profilleri ile merkezi bir yerde tanımlanır.
+4.  **Performans Optimizasyonu:** AutoMapper, büyük veri setleri üzerinde optimize edilmiş dönüşüm işlemleri yapar.
+5.  **Okunabilir ve Temiz Kod:** Dönüşüm mantığını merkezi bir profile taşıdığı için kodunuzu daha temiz hale getirir.
+6.  **Çift Yönlü Dönüşüm:** Nesneler arasında çift yönlü dönüşümü destekler.
+7.  **Koşullu ve Özel Dönüşümler:** Belirli koşullara bağlı olarak dönüşüm yapabilir.
+8.  **Koleksiyonları Dönüştürme:** Koleksiyonları da kolayca dönüştürebilir.
+9.  **Test Edilebilirlik:** Dönüşüm kuralları bağımsız olarak test edilebilir.
+10. **Framework ve Teknoloji Bağımsızlığı:** Tüm C# projelerinde kullanılabilir.
+
+## 6. Sonuç
+
+AutoMapper, yazılım projelerinde sıkça karşılaşılan nesne dönüşümü ihtiyaçlarını basitleştiren güçlü ve popüler bir araçtır. Bu yazıda, AutoMapper’ın temel kullanımını, ASP.NET Core projelerinde nasıl entegre edileceğini ve dönüşüm işlemlerini nasıl yöneteceğinizi öğrendik.
+
+

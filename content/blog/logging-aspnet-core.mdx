@@ -1,0 +1,169 @@
+---
+title: "Logging Nedir? ASP.NET Core’da Loglama Stratejileri"
+date: "2025-01-09"
+description: "Loglama kavramı, önemi, ASP.NET Core loglama altyapısı, ILogger kullanımı ve Serilog gibi stratejiler."
+tags: ["Logging", "ASP.NET Core", "Best Practices", "Serilog"]
+readTime: "4 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/logging-nedir-asp-net-coreda-loglama-stratejileri-543cb2ebfdce"
+---
+
+Loglama, yazılım geliştirme süreçlerinde uygulama davranışlarını takip etmek, hataları çözmek ve sistem performansını izlemek amacıyla kullanılan kritik bir tekniktir. Uygulamanın çalışma sırasında kaydettiği bilgiler, geliştiricilere ve operasyon ekiplerine değerli bir içgörü sağlar. ASP.NET Core, loglama için güçlü bir altyapı sunarak uygulama içinde standart ve özelleştirilmiş loglama stratejileri uygulamanıza olanak tanır. Bu yazıda, logging kavramını, loglama stratejilerini ve ASP.NET Core’da loglama altyapısını detaylı bir şekilde ele alacağız. Ayrıca, C# kod örnekleriyle loglama mekanizmalarını pratikte nasıl uygulayacağınızı göstereceğiz.
+
+## 1. Logging Nedir ve Neden Önemlidir?
+
+Logging (Günlükleme), bir uygulamanın çalışma sırasında belirli olayları kaydetmesi anlamına gelir. Loglar, bir uygulamanın ne yaptığını ve hangi durumda olduğunu anlamak, belirlemek için kullanılır.
+
+**Logging’in Başlıca Kullanım Alanları:**
+*   **Hata Tespiti:** Uygulama çalışırken oluşan hataları kaydederek çözüm sürecini hızlandırır.
+*   **Performans İzleme:** Sistem performansını değerlendirmek için metrikler sağlar.
+*   **Güvenlik:** Güvenlik tehditlerini ve şüpheli aktiviteleri takip etmeye yardımcı olur.
+*   **Sorun Giderme:** Çalışma zamanında meydana gelen olayları izleyerek hataları daha kolay çözmenizi sağlar.
+
+## 2. ASP.NET Core’da Loglama Altyapısı
+
+ASP.NET Core, güçlü bir loglama altyapısı sunar. Varsayılan olarak `ILogger` arayüzünü kullanır ve aşağıdaki gibi çeşitli sağlayıcıları destekler:
+
+*   **Console:** Logların konsola yazdırılmasını sağlar. Geliştirme sürecinde anlık olarak uygulama çıktısını görmek için kullanılır.
+*   **Debug:** Logların Debug Output Window (Hata Ayıklama Çıkış Penceresi) gibi bir hata ayıklama aracına yazdırılmasını sağlar.
+*   **EventSource:** Logların Windows işletim sistemine ait Event Tracing for Windows (ETW) altyapısına yazılmasını sağlar.
+*   **Azure Monitor:** Logların Microsoft Azure platformunda Application Insights veya Azure Monitor gibi hizmetlere gönderilmesini sağlar.
+
+## 3. ASP.NET Core’da Loglama Kurulumu
+
+### Adım 1: Loglama Yapılandırması
+
+`Program.cs` dosyasında loglama yapılandırmasını yapabilirsiniz:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Loglama sağlayıcılarını yapılandırıyoruz
+builder.Logging.ClearProviders(); // Varsayılan sağlayıcıları temizle
+builder.Logging.AddConsole(); // Konsol loglama ekle
+builder.Logging.AddDebug(); // Debug loglama ekle
+
+var app = builder.Build();
+
+app.MapGet("/", () => "Merhaba Loglama!");
+
+app.Run();
+```
+
+## 4. ILogger Kullanımı
+
+`ILogger`, loglama işlemleri için kullanılan temel arayüzdür. Bu arayüzle farklı seviyelerde loglama yapabilirsiniz:
+
+**Loglama Seviyeleri:**
+*   Trace: En detaylı loglar.
+*   Debug: Hata ayıklama için bilgi.
+*   Information: Genel bilgi logları.
+*   Warning: Uyarılar.
+*   Error: Hatalar.
+*   Critical: Kritik hatalar.
+
+**ILogger Kullanımı:**
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+
+[ApiController]
+[Route("api/[controller]")]
+public class HomeController : ControllerBase
+{
+    private readonly ILogger<HomeController> _logger;
+
+    public HomeController(ILogger<HomeController> logger)
+    {
+        _logger = logger;
+    }
+
+    [HttpGet]
+    public IActionResult Get()
+    {
+        _logger.LogInformation("HomeController/Get endpoint çağrıldı.");
+        _logger.LogWarning("Bu bir uyarı mesajıdır.");
+        _logger.LogError("Bu bir hata mesajıdır.");
+
+        return Ok("Loglama işlemi tamamlandı.");
+    }
+}
+```
+
+## 5. Loglama Stratejileri
+
+### 1. Farklı Loglama Sağlayıcıları Kullanımı
+
+ASP.NET Core, farklı loglama sağlayıcılarını destekler. Örneğin, logları bir dosyaya yazdırmak için Serilog veya NLog gibi üçüncü parti kütüphaneler kullanılabilir.
+
+**Serilog Kurulumu:**
+
+NuGet paketini ekleyin:
+```bash
+dotnet add package Serilog.Extensions.Logging
+dotnet add package Serilog.Sinks.Console
+```
+
+Serilog’u yapılandırın:
+
+```csharp
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+var app = builder.Build();
+
+app.Run();
+```
+
+### 2. Log Formatlama ve Filtreleme
+
+Loglama işlemleri sırasında belirli seviyelerdeki logları filtrelemek veya özel bir format kullanmak isteyebilirsiniz.
+
+```csharp
+builder.Logging.AddConsole(options =>
+{
+    options.FormatterName = "json"; // JSON formatında loglama
+});
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning); // Microsoft loglarını filtrele
+```
+
+### 3. Çevreye Göre Loglama
+
+Farklı çevrelerde (Development, Production) farklı loglama seviyeleri kullanabilirsiniz:
+
+```csharp
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.SetMinimumLevel(LogLevel.Debug);
+}
+else
+{
+    builder.Logging.SetMinimumLevel(LogLevel.Warning);
+}
+```
+
+## 6. Loglama İçin En İyi Uygulamalar
+
+*   **Log Seviyelerini Doğru Kullanın:** Bilgilendirme, uyarı ve hata seviyelerini doğru sınıflandırın.
+*   **Hassas Verileri Kaydetmeyin:** Kullanıcı şifreleri veya kişisel bilgileri loglara yazdırmaktan kaçının.
+*   **Performans Üzerinde Düşünün:** Gereksiz loglama performansı olumsuz etkileyebilir.
+*   **Yapılandırmayı Merkezi Hale Getirin:** Loglama ayarlarını tek bir yerde toplayarak yönetimi kolaylaştırın.
+*   **Üçüncü Parti Araçları Değerlendirin:** Serilog, NLog veya Elastic Stack gibi araçlarla loglama yeteneklerinizi genişletin.
+
+## 7. Sonuç
+
+Loglama, yazılım projelerinde şeffaflık, performans ve güvenlik sağlamak için hayati bir araçtır. Bu yazıda, ASP.NET Core’da loglama altyapısını, loglama seviyelerini ve farklı stratejileri ele aldık.
+
+Doğru loglama stratejileri ile projelerinizin yönetilebilirliğini artırabilir, hataları daha hızlı çözebilir ve performansı izleyebilirsiniz.
+
+

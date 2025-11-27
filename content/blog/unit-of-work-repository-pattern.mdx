@@ -1,0 +1,193 @@
+---
+title: "Unit of Work ve Repository Design Pattern Kullanımı"
+date: "2024-11-17"
+description: "Veritabanı operasyonlarında verimlilik için Unit of Work ve Repository tasarım desenlerinin kullanımı."
+tags: ["Unit of Work", "Repository Pattern", "Design Patterns", "ASP.NET Core"]
+readTime: "4 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/unit-of-work-ve-repository-design-pattern-kullan%C4%B1m%C4%B1-veritaban%C4%B1-operasyonlar%C4%B1nda-verimlilik-9eaf77cda357"
+---
+
+Veritabanı işlemleri, yazılım projelerinin en kritik alanlarından biridir. Deyim yerindeyse bel kemiğidir. Veritabanı operasyonlarının iyi yönetilmesi, uygulamanın performansı, sürdürülebilirliği ve ölçeklenebilirliği açısından büyük önem taşır. Bu yazıda, Unit of Work (UoW) ve Repository Design Pattern yaklaşımlarını ele alarak, bu tasarım desenlerinin nasıl kullanıldığını, avantajlarını ve ASP.NET Core projelerinde nasıl uygulanabileceğini detaylandıracağız.
+
+## 1. Repository Design Pattern Nedir?
+
+Repository Design Pattern, veritabanı işlemlerini yönetmek için kullanılan bir tasarım desenidir(örüntüsüdür). Bu desen, veritabanı işlemlerini soyutlayarak, uygulamanın iş mantığı ile veri erişim katmanını ayırır. Bu sayede, veritabanı işlemlerinde kod tekrarını önler ve daha düzenli bir yapı sunar.
+
+**Repository Design Pattern’in Faydaları:**
+*   **Modülerlik:** Veri erişim katmanının modüler olmasını sağlar.
+*   **Bağımlılıkların Azaltılması:** İş mantığı kodlarının veri erişim katmanından etkilenmesini önler.
+*   **Bakım Kolaylığı:** Merkezi bir noktada toplanan veri erişim kodları sayesinde bakım kolaylaşır.
+*   **Güvenlik:** Veri erişim işlemlerinin merkezi kontrolünü sağlar.
+
+**Repository Arayüzü:**
+
+```csharp
+public interface IRepository<T> where T : class
+{
+    IEnumerable<T> GetAll();
+    T GetById(int id);
+    void Add(T entity);
+    void Update(T entity);
+    void Delete(int id);
+}
+```
+
+**Repository Uygulaması:**
+
+```csharp
+public class Repository<T> : IRepository<T> where T : class
+{
+    private readonly DbContext _context;
+    private readonly DbSet<T> _dbSet;
+
+    public Repository(DbContext context)
+    {
+        _context = context;
+        _dbSet = context.Set<T>();
+    }
+
+    public IEnumerable<T> GetAll()
+    {
+        return _dbSet.ToList();
+    }
+
+    public T GetById(int id)
+    {
+        return _dbSet.Find(id);
+    }
+
+    public void Add(T entity)
+    {
+        _dbSet.Add(entity);
+    }
+
+    public void Update(T entity)
+    {
+        _dbSet.Update(entity);
+    }
+
+    public void Delete(int id)
+    {
+        var entity = _dbSet.Find(id);
+        if (entity != null) _dbSet.Remove(entity);
+    }
+}
+```
+
+## 2. Unit of Work Nedir?
+
+Unit of Work (UoW), bir işlem birimi (transaction) olarak çalışır ve tüm veritabanı işlemlerini tek bir noktada yönetir. Bu desen, birden fazla repository ile çalışırken veritabanı işlemlerinin tutarlılığını sağlar. Örneğin, bir işlemin tamamında hata oluşursa, UoW sayesinde tüm değişiklikler geri alınabilir (rollback).
+
+**Unit of Work’in Faydaları:**
+*   **Transaction yönetimi:** İşlemleri tek bir bütün olarak ele alır.
+*   **Koordinasyon:** Birden fazla işlemin koordinasyonunu sağlar.
+*   **Veri Tutarlılığı:** Veri bütünlüğünü korur.
+*   **Performans İyileştirmesi:** Gereksiz veritabanı bağlantılarını azaltır.
+*   **Kolay İzlenebilirlik:** Hataların izlenmesini kolaylaştırır.
+
+**Unit of Work Arayüzü:**
+
+```csharp
+public interface IUnitOfWork : IDisposable
+{
+    IRepository<T> GetRepository<T>() where T : class;
+    int SaveChanges();
+}
+```
+
+**Unit of Work Uygulaması:**
+
+```csharp
+public class UnitOfWork : IUnitOfWork
+{
+    private readonly DbContext _context;
+    private readonly Dictionary<Type, object> _repositories = new();
+
+    public UnitOfWork(DbContext context)
+    {
+        _context = context;
+    }
+
+    public IRepository<T> GetRepository<T>() where T : class
+    {
+        if (!_repositories.ContainsKey(typeof(T)))
+        {
+            var repository = new Repository<T>(_context);
+            _repositories.Add(typeof(T), repository);
+        }
+
+        return (IRepository<T>)_repositories[typeof(T)];
+    }
+
+    public int SaveChanges()
+    {
+        return _context.SaveChanges();
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+    }
+}
+```
+
+## 3. ASP.NET Core’da Unit of Work ve Repository Design Pattern Kullanımı
+
+### 1. Servislerin Kaydedilmesi
+
+`Startup.cs` ya da `Program.cs` dosyasında UoW ve Repository servislerini kaydediyoruz:
+
+```csharp
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+    services.AddScoped<IUnitOfWork, UnitOfWork>();
+}
+```
+
+### 2. Kullanım Örneği
+
+Bir `ProductController` üzerinden, ürün yönetimi işlemleri yapalım:
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class ProductController : ControllerBase
+{
+    private readonly IUnitOfWork _unitOfWork;
+
+    public ProductController(IUnitOfWork unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+    }
+
+    [HttpGet]
+    public IActionResult GetAllProducts()
+    {
+        var products = _unitOfWork.GetRepository<Product>().GetAll();
+        return Ok(products);
+    }
+
+    [HttpPost]
+    public IActionResult AddProduct([FromBody] Product product)
+    {
+        _unitOfWork.GetRepository<Product>().Add(product);
+        _unitOfWork.SaveChanges();
+        return Ok("Product added successfully.");
+    }
+}
+```
+
+## 4. Repository Pattern ve Unit of Work’in Avantajları
+
+*   **Kod Tekrarını Azaltır:** Veri erişim kodlarının merkezi bir yerde toplanmasını sağlar.
+*   **Test Edilebilirlik:** Mock repository’ler kullanarak test süreçlerini kolaylaştırır.
+*   **Performans:** Transaction yönetimi sayesinde performansı artırır.
+*   **Esneklik:** Farklı veri kaynaklarıyla çalışmayı kolaylaştırır.
+*   **Sürdürülebilirlik:** Kodun daha düzenli ve yönetilebilir olmasını sağlar.
+
+## Sonuç
+
+Unit of Work ve Repository Pattern, yazılım geliştiricilerin veritabanı işlemlerini daha verimli, düzenli ve ölçeklenebilir bir şekilde yönetmesine olanak tanır. ASP.NET Core projelerinde bu tasarım desenlerini uygulamak, projelerinizin test edilebilirliğini ve sürdürülebilirliğini artırır.
+
+

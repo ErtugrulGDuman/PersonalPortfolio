@@ -1,0 +1,133 @@
+---
+title: "Docker Nedir? .NET Core Projelerinde Docker Kullanımı"
+date: "2025-01-20"
+description: "Docker kavramı, temel bileşenleri, avantajları ve .NET Core projelerinde Dockerfile ve Docker Compose kullanımı."
+tags: ["Docker", ".NET Core", "DevOps", "Containers"]
+readTime: "3 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/docker-nedir-net-core-projelerinde-docker-kullan%C4%B1m%C4%B1-0d768f8c2f8f"
+---
+
+Günümüz yazılım geliştirme dünyasında, uygulamaları taşınabilir, hızlı ve kolay bir şekilde dağıtmak, nakletmek büyük bir önem taşıyor. İşte bu noktada Docker, yazılım geliştirme ve dağıtım süreçlerini devrim niteliğinde değiştiren bir teknoloji olarak öne çıkıyor. Docker, uygulamaları ve bağımlılıklarını bir araya getirerek taşınabilir, hafif ve izole edilmiş bir çalışma ortamında çalıştırılmasını sağlar. Bu yazıda, Docker kavramını, temel bileşenlerini ve .NET Core projelerinde Docker kullanımını detaylı bir şekilde ele alacağız. Ayrıca, pratik örneklerle Docker’ın nasıl kullanılacağını göstereceğiz.
+
+## 1. Docker Nedir?
+
+Docker, bir uygulamayı çalıştırmak için gerekli olan tüm bileşenleri (kod, kütüphaneler, bağımlılıklar) içeren konteynerler (containers) oluşturarak, uygulamaların farklı ortamlarda aynı şekilde çalışmasını sağlayan açık kaynaklı bir platformdur.
+
+**Docker’ın Temel Bileşenleri:**
+*   **Docker Image (Görüntü):** Uygulama ve çalışması için gereken bağımlılıkları içeren bir şablon.
+*   **Docker Container (Konteyner):** Bir Docker görüntüsünden oluşturulan çalışan bir örnek.
+*   **Dockerfile:** Docker görüntüsünü oluşturmak için kullanılan yapılandırma dosyası.
+*   **Docker Compose:** Birden fazla konteynerin birlikte çalışmasını kolaylaştıran araç.
+*   **Docker Hub:** Paylaşılan Docker görüntüleri için bir çevrimiçi depo.
+
+## 2. Docker Kullanımının Avantajları
+
+*   **Platform Bağımsızlığı:** Uygulamanız, herhangi bir sistemde aynı şekilde çalışır.
+*   **Hafif Yapı:** Sanal makinelerden daha az kaynak tüketir.
+*   **Hızlı Dağıtım:** Konteynerlerin hızlı bir şekilde oluşturulmasını ve çalıştırılmasını sağlar.
+*   **Kolay Yönetim:** Birden fazla uygulamayı izole edilmiş bir şekilde yönetebilirsiniz.
+*   **Sürümleme:** Docker görüntüleri versiyonlanabilir, bu da geri dönüş işlemlerini kolaylaştırır.
+
+## 3. .NET Core Projelerinde Docker Kullanımı
+
+### Adım 1: .NET Core Web API Projesi Oluşturma
+
+Yeni bir ASP.NET Core Web API projesi oluşturun:
+
+```bash
+dotnet new webapi -n DockerExample
+cd DockerExample
+```
+
+### Adım 2: Dockerfile Oluşturma
+
+Projenizin kök dizinine bir `Dockerfile` oluşturun:
+
+```dockerfile
+# Temel görüntü
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+WORKDIR /app
+EXPOSE 80
+
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+WORKDIR /src
+COPY ["DockerExample/DockerExample.csproj", "./"]
+RUN dotnet restore "./DockerExample.csproj"
+COPY . .
+WORKDIR "/src/"
+RUN dotnet build "DockerExample.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "DockerExample.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "DockerExample.dll"]
+```
+
+**Açıklama:**
+*   `FROM`: Hangi temel görüntünün kullanılacağını belirtir.
+*   `WORKDIR`: Çalışma dizinini ayarlar.
+*   `COPY`: Dosyaları Docker konteynerine kopyalar.
+*   `RUN`: Docker görüntüsünü oluştururken çalıştırılacak komutları belirtir.
+*   `ENTRYPOINT`: Konteyner başlatıldığında çalışacak komutu tanımlar.
+
+### Adım 3: Docker Build ve Run Komutları
+
+Docker görüntüsü oluşturun:
+
+```bash
+docker build -t dockerexample .
+```
+
+Oluşturulan görüntüyü çalıştırın:
+
+```bash
+docker run -d -p 8080:80 --name myapp dockerexample
+```
+
+**Açıklama:**
+*   `-d`: Konteyneri arka planda çalıştırır.
+*   `-p`: Port yönlendirmesini ayarlar (8080 -> 80).
+*   `--name`: Konteynere bir ad atar.
+
+Artık tarayıcınızda `http://localhost:8080` adresine giderek uygulamanıza erişebilirsiniz.
+
+## 4. Docker Compose Kullanımı
+
+Birden fazla konteyner çalıştırmanız gerektiğinde Docker Compose kullanabilirsiniz.
+
+`docker-compose.yml` Dosyası:
+
+```yaml
+version: '3.4'
+
+services:
+  webapi:
+    image: dockerexample
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+```
+
+Compose dosyasını çalıştırın:
+
+```bash
+docker-compose up
+```
+
+## 5. Docker İle Geliştirme Sürecinde Dikkat Edilecek Noktalar
+
+*   **Küçük Görüntüler Kullanma:** Daha küçük temel görüntüler, daha hızlı build ve dağıtım sağlar.
+*   **Multi-Stage Build:** Farklı aşamalarda bağımlılıkları optimize ederek daha hafif konteynerler oluşturun.
+*   **Güvenlik:** Hassas bilgileri (örneğin, API anahtarları) görüntüye dahil etmeyin. Bunun yerine, ortam değişkenleri kullanın.
+*   **Volümler:** Uygulamanın verilerini tutmak için Docker volümlerini kullanarak verilerin kalıcı olmasını sağlayın.
+
+## 6. Sonuç
+
+Docker, .NET Core projelerinde taşınabilirliği artıran, dağıtım sürecini hızlandıran ve geliştirici deneyimini iyileştiren güçlü bir araçtır. Bu yazıda, Docker’ın temel kavramlarını, avantajlarını ve bir ASP.NET Core uygulamasında Docker kullanımını detaylıca inceledik.
+
+

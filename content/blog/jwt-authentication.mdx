@@ -1,0 +1,210 @@
+---
+title: "JWT Authentication ile Güvenli Kimlik Doğrulama"
+date: "2024-12-08"
+description: "JWT (JSON Web Token) nedir, yapısı, avantajları ve ASP.NET Core ile güvenli kimlik doğrulama uygulaması."
+tags: ["JWT", "Authentication", "Security", "ASP.NET Core"]
+readTime: "5 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/jwt-authentication-ile-g%C3%BCvenli-kimlik-do%C4%9Frulama-ed9ad1418921"
+---
+
+Web ve mobil uygulamalarda güvenli bir kimlik doğrulama mekanizması sağlamak, modern yazılım geliştirme süreçlerinin en kritik aşamalarından biridir. JWT (JSON Web Token), stateless ve esnek yapısıyla kimlik doğrulamada yaygın olarak kullanılan bir yöntemdir. Bu yazıda, JWT Authentication’ın temel konseptlerini ve ASP.NET Core ile nasıl uygulanacağını detaylı bir şekilde ele alacağız. Ayrıca, C# kod örnekleriyle JWT tabanlı bir kimlik doğrulama sistemi geliştireceğiz.
+
+## 1. JSON Web Token (JWT) Nedir?
+
+JWT, kimlik doğrulama ve bilgi paylaşımı için kullanılan açık bir standarttır (RFC 7519). JWT, JSON formatında veriler içerir ve dijital olarak imzalanmıştır. Bu sayede, içeriğin değiştirilmediği doğrulanabilir.
+
+**JWT’nin Yapısı:**
+JWT, üç ana bileşenden oluşur ve `.` ile ayrılır:
+
+1.  **Header (Başlık):** Algoritma ve token tipi bilgilerini içerir.
+    ```json
+    {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+    ```
+2.  **Payload (Yük):** Kullanıcıya ait verileri içerir (örneğin, kullanıcı ID’si, rol bilgisi).
+    ```json
+    {
+        "sub": "1234567890",
+        "name": "John Doe",
+        "role": "Admin",
+        "iat": 1516239022
+    }
+    ```
+3.  **Signature (İmza):** Token’ın bütünlüğünü doğrulamak için kullanılır.
+
+**JWT’nin Özellikleri:**
+*   **Stateless:** Sunucu, kullanıcı hakkında durum bilgisi saklamaz.
+*   **Taşınabilir:** Herhangi bir platformda kullanılabilir.
+*   **Kolay Doğrulama:** İmza, token’ın değiştirilmediğini doğrular.
+
+## 2. JWT Authentication Neden Kullanılır?
+
+JWT Authentication, güvenli ve performanslı bir kimlik doğrulama yöntemi sağlar. Avantajları şunlardır:
+
+*   **Durumsuz:** Token, istemci tarafından saklanır. Sunucunun bir oturum (session) saklamasına gerek yoktur.
+*   **Güvenli:** JWT, dijital olarak imzalanır, bu nedenle token’ın içeriği değiştirilemez.
+*   **Esnek:** Mobil, web ve diğer platformlarla kolayca entegre olur.
+*   **Performanslı:** Sunucu tarafında durumsuz olduğu için yük azdır.
+
+## 3. ASP.NET Core ile JWT Authentication Uygulaması
+
+### Adım 1: ASP.NET Core Web API Projesi Oluşturma
+
+```bash
+dotnet new webapi -n JwtAuthExample
+```
+
+### Adım 2: Gerekli NuGet Paketlerini Ekleyin
+
+```bash
+dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
+dotnet add package System.IdentityModel.Tokens.Jwt
+```
+
+### Adım 3: Kullanıcı Modeli ve DTO’ları Tanımlayın
+
+```csharp
+public class User
+{
+    public string Username { get; set; }
+    public string Password { get; set; }
+    public string Role { get; set; }
+}
+
+public class LoginDto
+{
+    public string Username { get; set; }
+    public string Password { get; set; }
+}
+```
+
+### Adım 4: JWT Oluşturmak için Bir Servis Yazın
+
+```csharp
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+
+public class JwtService
+{
+    private readonly string _secret;
+    private readonly string _issuer;
+
+    public JwtService(string secret, string issuer)
+    {
+        _secret = secret;
+        _issuer = issuer;
+    }
+
+    public string GenerateToken(string username, string role)
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.Name, username),
+            new Claim(ClaimTypes.Role, role)
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _issuer,
+            audience: _issuer,
+            claims: claims,
+            expires: DateTime.Now.AddMinutes(30),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}
+```
+
+### Adım 5: Authentication ve Authorization Middleware’i Yapılandırın
+
+`Program.cs` dosyasında JWT doğrulama ayarlarını yapın:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+var secretKey = "SuperSecretKey12345";
+builder.Services.AddSingleton(new JwtService(secretKey, builder.Configuration["Jwt:Issuer"]));
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Issuer"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+```
+
+### Adım 6: Login ve Yetkilendirme İçin Controller Yazın
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly JwtService _jwtService;
+
+    public AuthController(JwtService jwtService)
+    {
+        _jwtService = jwtService;
+    }
+
+    [HttpPost("login")]
+    public IActionResult Login([FromBody] LoginDto loginDto)
+    {
+        // Örnek kullanıcı
+        var user = new User
+        {
+            Username = "admin",
+            Password = "password",
+            Role = "Admin"
+        };
+
+        if (loginDto.Username == user.Username && loginDto.Password == user.Password)
+        {
+            var token = _jwtService.GenerateToken(user.Username, user.Role);
+            return Ok(new { Token = token });
+        }
+
+        return Unauthorized();
+    }
+
+    [HttpGet("secure")]
+    [Authorize]
+    public IActionResult SecureEndpoint()
+    {
+        return Ok("Bu endpoint'e yalnızca yetkilendirilmiş kullanıcılar erişebilir.");
+    }
+}
+```
+
+## 4. Sonuç
+
+JWT Authentication, modern uygulamalarda güvenli kimlik doğrulama ve yetkilendirme sağlamanın güçlü bir yoludur. Bu yazıda, JWT’nin temel kavramlarını ve ASP.NET Core’da nasıl kullanılacağını örneklerle ele aldık. Bu bilgilerle projelerinizde güvenli, performanslı ve ölçeklenebilir kimlik doğrulama sistemleri geliştirebilirsiniz.
+
+

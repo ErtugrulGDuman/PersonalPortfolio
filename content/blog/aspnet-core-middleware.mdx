@@ -1,0 +1,89 @@
+---
+title: "ASP.NET Core Middleware Yapısı ve Kullanımı"
+date: "2024-03-15"
+description: "ASP.NET Core request pipeline'ını anlamak ve custom middleware yazmak üzerine detaylı bir rehber."
+tags: [".NET Core", "Middleware", "Backend"]
+readTime: "5 dk"
+---
+
+# ASP.NET Core Middleware Nedir?
+
+ASP.NET Core'da Middleware, HTTP isteklerini işleyen ve yanıt oluşturan bir yazılım bileşenidir. Uygulama pipeline'ı, bir dizi middleware bileşeninden oluşur. Her bileşen şunları yapabilir:
+
+1. İsteği bir sonraki bileşene geçirmeden önce işlem yapabilir.
+2. İsteği bir sonraki bileşene geçirebilir.
+3. Sonraki bileşen işini bitirdikten sonra tekrar işlem yapabilir.
+
+## Nasıl Çalışır?
+
+Middleware'ler `Startup.cs` dosyasındaki `Configure` metodunda (veya .NET 6+ ile `Program.cs` içinde) tanımlanır. Sıralama çok önemlidir!
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+// Built-in middleware'ler
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+app.UseAuthorization();
+
+// Custom middleware
+app.Use(async (context, next) =>
+{
+    // Request gelince çalışır
+    Console.WriteLine("Request geldi");
+    
+    await next.Invoke(); // Sonraki middleware'e geç
+    
+    // Response dönerken çalışır
+    Console.WriteLine("Response dönüyor");
+});
+
+app.MapControllers();
+app.Run();
+```
+
+## Custom Middleware Yazmak
+
+Daha temiz bir yapı için middleware'i ayrı bir sınıf olarak yazabiliriz:
+
+```csharp
+public class RequestLoggingMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public RequestLoggingMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        Console.WriteLine($"Request: {context.Request.Method} {context.Request.Path}");
+        
+        await _next(context);
+        
+        Console.WriteLine($"Response: {context.Response.StatusCode}");
+    }
+}
+```
+
+Ve bunu extension method ile ekleyebiliriz:
+
+```csharp
+public static class MiddlewareExtensions
+{
+    public static IApplicationBuilder UseRequestLogging(this IApplicationBuilder builder)
+    {
+        return builder.UseMiddleware<RequestLoggingMiddleware>();
+    }
+}
+```
+
+Kullanımı:
+```csharp
+app.UseRequestLogging();
+```
+
+Bu yapı sayesinde uygulamanızın request pipeline'ını modüler bir şekilde yönetebilirsiniz.

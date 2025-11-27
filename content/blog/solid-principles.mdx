@@ -1,0 +1,307 @@
+---
+title: "SOLID Prensipleri: Temiz Kodun Temeli"
+date: "2024-11-10"
+description: "SOLID prensipleri nedir? SRP, OCP, LSP, ISP ve DIP prensiplerinin ASP.NET Core/C# örnekleriyle detaylı incelemesi."
+tags: ["SOLID", "Clean Code", "Design Principles", "OOP"]
+readTime: "5 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/solid-prensipleri-temiz-kodun-temeli-6540b3349f06"
+---
+
+Yazılım dünyasında kaliteli, sürdürülebilir ve genişletilebilir kod yazmanın önemli adımlarından biri, SOLID prensiplerine hakim olmaktır. Bu beş temel prensip, nesne yönelimli programlamada (OOP) kodu daha anlaşılır ve bakım yapılabilir hale getirir. SOLID prensipleriyle uyumlu bir kod yazmak, yazılımcıya esneklik sağlarken, uygulamanın hatasız çalışmasına katkıda bulunur. Bu yazıda, SOLID prensiplerini ayrıntılı olarak inceleyecek ve her bir prensibi ASP.NET Core/C# örnekleriyle ele alacağız.
+
+## SOLID Prensipleri Nedir?
+
+SOLID, beş ana prensipten oluşur ve Robert C. Martin (namıdiğer “Uncle Bob”) tarafından ortaya atılmıştır. Bu prensipler(ilkeler) şu şekildedir:
+
+1.  **S**ingle Responsibility Principle (Tek Sorumluluk İlkesi)
+2.  **O**pen/Closed Principle (Açık/Kapalı İlkesi)
+3.  **L**iskov Substitution Principle (Liskov’un Yerine Geçme İlkesi)
+4.  **I**nterface Segregation Principle (Arayüz Ayrımı İlkesi)
+5.  **D**ependency Inversion Principle (Bağımlılıkların Ters Çevrilmesi İlkesi)
+
+## 1. Single Responsibility Principle (SRP)
+
+**Her sınıfın yalnızca tek bir sorumluluğu olmalıdır.**
+
+Bu prensip, bir sınıfın yalnızca tek bir sorumluluğa sahip olmasını önerir. Bir sınıfın birden fazla sorumluluğa sahip olması, kodun anlaşılmasını zorlaştırır ve güncellemeler yapılırken hatalara ve neden olabilir.
+
+**SRP Örneği:**
+
+Aşağıdaki örnekte, `OrderService` sınıfı hem sipariş işlemlerini hem de e-posta gönderimini yapıyor. Bu, SRP’ye aykırıdır.
+
+```csharp
+public class OrderService
+{
+    public void ProcessOrder()
+    {
+        // Siparişi işleme
+    }
+
+    public void SendEmail()
+    {
+        // E-posta gönderimi
+    }
+}
+```
+
+SRP’ye uygun hale getirmek için `OrderService` sınıfını sadece sipariş işleme sorumluluğuna sahip hale getirirken, e-posta gönderme işini `EmailService` sınıfına devrediyoruz:
+
+```csharp
+public class OrderService
+{
+    private readonly IEmailService _emailService;
+
+    public OrderService(IEmailService emailService)
+    {
+        _emailService = emailService;
+    }
+
+    public void ProcessOrder()
+    {
+        // Siparişi işleme
+        _emailService.SendEmail();
+    }
+}
+
+public interface IEmailService
+{
+    void SendEmail();
+}
+
+public class EmailService : IEmailService
+{
+    public void SendEmail()
+    {
+        // E-posta gönderimi
+    }
+}
+```
+
+## 2. Open/Closed Principle (OCP)
+
+**Sınıflar genişletilebilir olmalı, ancak değiştirilebilir olmamalıdır.**
+
+Bu ilke, mevcut sınıfların davranışlarını değiştirmeden genişletilebilir olmalarını önerir. Yani bir sınıf, yeni işlevler eklenerek genişletilebilir ancak mevcut kodu değiştirilmemelidir.
+
+**OCP Örneği:**
+
+```csharp
+public class Rectangle
+{
+    public int Width { get; set; }
+    public int Height { get; set; }
+}
+
+public class AreaCalculator
+{
+    public int CalculateArea(Rectangle rectangle)
+    {
+        return rectangle.Width * rectangle.Height;
+    }
+}
+```
+
+Bu kod, yalnızca Rectangle türüyle çalışır. OCP’ye uygun hale getirmek için, tüm şekillerin bir `IShape` arayüzünü uygulamasını sağlayabiliriz.
+
+```csharp
+public interface IShape
+{
+    int CalculateArea();
+}
+
+public class Rectangle : IShape
+{
+    public int Width { get; set; }
+    public int Height { get; set; }
+
+    public int CalculateArea()
+    {
+        return Width * Height;
+    }
+}
+
+public class Circle : IShape
+{
+    public int Radius { get; set; }
+
+    public int CalculateArea()
+    {
+        return (int)(Math.PI * Radius * Radius);
+    }
+}
+
+public class AreaCalculator
+{
+    public int CalculateArea(IShape shape)
+    {
+        return shape.CalculateArea();
+    }
+}
+```
+
+## 3. Liskov Substitution Principle (LSP)
+
+**Bir sınıf, türevi olan sınıflarla sorunsuzca yer değiştirebilmelidir.**
+
+Bu ilke, temel sınıfların yerine geçecek alt sınıfların, temel sınıfın davranışını değiştirmeden kullanılabilmesini, erişebilmesini gerektirir.
+
+**LSP Örneği:**
+
+Aşağıdaki örnekte, `Bird` sınıfının bir türevi olan `Ostrich` (devekuşu), uçma özelliğine sahip değil ve bu Liskov İlkesi’ni ihlal ediyor.
+
+```csharp
+public class Bird
+{
+    public virtual void Fly() { }
+}
+
+public class Ostrich : Bird
+{
+    public override void Fly()
+    {
+        throw new NotImplementedException();
+    }
+}
+```
+
+LSP’ye uygun hale getirmek için `Bird` sınıfını iki farklı türe ayırabiliriz:
+
+```csharp
+public abstract class Bird { }
+
+public interface IFlyingBird
+{
+    void Fly();
+}
+
+public class Sparrow : Bird, IFlyingBird
+{
+    public void Fly() { }
+}
+
+public class Ostrich : Bird
+{
+    // Uçma özelliği yok
+}
+```
+
+## 4. Interface Segregation Principle (ISP)
+
+**Bir arayüz, sadece ihtiyacı olan metotları barındırmalıdır.**
+
+Bu prensip, gereksiz metodlarla karmaşıklaşan büyük arayüzlerden kaçınmayı sağlar. Arayüzler, sınıfların yalnızca ihtiyaç duyduğu işlevleri içermelidir.
+
+**ISP Örneği:**
+
+```csharp
+public interface IWorker
+{
+    void Work();
+    void Eat();
+}
+
+public class Robot : IWorker
+{
+    public void Work() { }
+    public void Eat()
+    {
+        throw new NotImplementedException();
+    }
+}
+```
+
+ISP’ye uygun hale getirmek için `IWorker` arayüzünü iki ayrı arayüze bölebiliriz:
+
+```csharp
+public interface IWorkable
+{
+    void Work();
+}
+
+public interface IEatable
+{
+    void Eat();
+}
+
+public class Robot : IWorkable
+{
+    public void Work() { }
+}
+
+public class Human : IWorkable, IEatable
+{
+    public void Work() { }
+    public void Eat() { }
+}
+```
+
+## 5. Dependency Inversion Principle (DIP)
+
+**Yüksek seviye modüller, düşük seviye modüllere bağımlı olmamalıdır. Her iki modül de soyutlamalara bağımlı olmalıdır.**
+
+**DIP Örneği:**
+
+```csharp
+public class Light
+{
+    public void TurnOn() { }
+}
+
+public class Switch
+{
+    private Light _light;
+
+    public Switch(Light light)
+    {
+        _light = light;
+    }
+
+    public void Operate()
+    {
+        _light.TurnOn();
+    }
+}
+```
+
+Burada `Switch` sınıfı `Light` sınıfına doğrudan bağımlıdır. DIP’ye uygun hale getirmek için araya bir arayüz ekleyebiliriz:
+
+```csharp
+public interface IDevice
+{
+    void TurnOn();
+}
+
+public class Light : IDevice
+{
+    public void TurnOn() { }
+}
+
+public class Switch
+{
+    private readonly IDevice _device;
+
+    public Switch(IDevice device)
+    {
+        _device = device;
+    }
+
+    public void Operate()
+    {
+        _device.TurnOn();
+    }
+}
+```
+
+## SOLID İlkelerinin Avantajları
+
+*   **Bakım Kolaylığı:** Kod daha anlaşılır ve güncellenebilir hale gelir.
+*   **Test Edilebilirlik:** Bağımlılıklar daha yönetilebilir olur.
+*   **Esneklik:** Uygulamalar yeni gereksinimlere göre kolayca genişletilebilir.
+*   **Hata Azaltma:** Kod yapısında iyileştirmeler, hataların önlenmesine katkı sağlar.
+*   **Sürdürülebilirlik:** Yazılımın gelecekte yapılacak değişikliklere uyum sağlamasına yardımcı olur.
+
+## Sonuç
+
+SOLID prensipleri, yazılım geliştiriciler için yol gösterici kurallar sunar. Bu prensipleri uygulayarak, daha sağlam, sürdürülebilir ve genişletilebilir uygulamalar geliştirmek mümkün olur.
+
+

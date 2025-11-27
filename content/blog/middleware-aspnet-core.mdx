@@ -1,0 +1,174 @@
+---
+title: "Middleware Nedir? ASP.NET Core’da Özel Middleware Geliştirme"
+date: "2024-12-08"
+description: "Middleware kavramı, ASP.NET Core pipeline yapısı ve özel middleware geliştirme adımları."
+tags: ["Middleware", "ASP.NET Core", "Backend", "C#"]
+readTime: "4 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/middleware-nedir-asp-net-coreda-%C3%B6zel-middleware-geli%C5%9Ftirme-5fde5e8e13cc"
+---
+
+Middleware, ASP.NET Core’un temel yapı taşlarından biri olan ve bir HTTP isteğinin sunucuya ulaştığında izlediği boru hattındaki (pipeline) adımları yöneten bir bileşendir. Bu yazıda, middleware kavramını, ASP.NET Core’da middleware’in nasıl çalıştığını ve kendi özel middleware’lerimizi nasıl geliştirebileceğimizi detaylıca ele alacağız. Ayrıca, C# ile basit ve işlevsel bir özel middleware örneği geliştireceğiz.
+
+## 1. Middleware Nedir?
+
+Middleware, HTTP isteklerini ve yanıtlarını işlemek için kullanılan modüllerdir. İstekler bir middleware zincirinden geçer ve her middleware:
+*   Bir işlemi gerçekleştirebilir (örneğin, kimlik doğrulama).
+*   İsteği bir sonraki middleware’e iletebilir.
+*   Yanıtın dönerken işlenmesini sağlayabilir.
+
+ASP.NET Core’da middleware, uygulamanın başlangıcından bitişine kadar isteğin nasıl işlendiğini tanımlar.
+
+**Örnek Middleware Kullanımları:**
+*   **Yetkilendirme (Authentication):** İsteğin yetkilendirilip yetkilendirilmediğini kontrol eder.
+*   **Hata Yönetimi (Error Handling):** Hataları yakalar ve kullanıcı dostu bir yanıt döner.
+*   **Günlük Kaydı (Logging):** Gelen ve giden isteklerin loglarını tutar.
+*   **Önbellekleme (Caching):** Yanıtların önbellekten sunulmasını sağlar.
+
+## 2. ASP.NET Core’da Middleware Nasıl Çalışır?
+
+ASP.NET Core’da middleware zinciri, `Startup.cs` ya da `Program.cs` dosyasındaki `app.Use()` metotları ile yapılandırılır. Middleware zinciri, bir HTTP isteği sunucuya geldiğinde sırayla işlenir.
+
+**Basit Bir Middleware Örneği:**
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+// Basit bir middleware tanımlıyoruz
+app.Use(async (context, next) =>
+{
+    Console.WriteLine("Middleware 1: Request geldi");
+    await next(); // Bir sonraki middleware'e geç
+    Console.WriteLine("Middleware 1: Response döndü");
+});
+
+app.Use(async (context, next) =>
+{
+    Console.WriteLine("Middleware 2: Request geldi");
+    await next();
+    Console.WriteLine("Middleware 2: Response döndü");
+});
+
+app.MapGet("/", () => "Merhaba Middleware!");
+
+app.Run();
+```
+
+## 3. Özel Middleware Geliştirme
+
+Kendi özel middleware’inizi geliştirerek ihtiyaçlarınıza uygun işlevsellikler ekleyebilirsiniz.
+
+### Adım 1: Middleware Sınıfı Oluşturma
+
+```csharp
+public class CustomMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public CustomMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        // İstek öncesi işlem
+        Console.WriteLine($"CustomMiddleware: {context.Request.Method} {context.Request.Path}");
+
+        await _next(context); // Bir sonraki middleware'e geç
+
+        // Yanıt sonrası işlem
+        Console.WriteLine("CustomMiddleware: Response tamamlandı");
+    }
+}
+```
+
+### Adım 2: Middleware’i Kullanıma Alma
+
+`Program.cs` dosyasına middleware’i dahil edin:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.UseMiddleware<CustomMiddleware>(); // Middleware'i ekledik
+
+app.MapGet("/", () => "Merhaba Özel Middleware!");
+
+app.Run();
+```
+
+## 4. Middleware’de Bağımlılık Enjeksiyonu (DI) Kullanımı
+
+Middleware’ler, ASP.NET Core’un DI (Dependency Injection) altyapısıyla entegre çalışabilir.
+
+**Örnek: Bir Servisin Middleware’de Kullanımı**
+
+Bir servis oluşturalım:
+
+```csharp
+public interface IMyService
+{
+    void Log(string message);
+}
+
+public class MyService : IMyService
+{
+    public void Log(string message)
+    {
+        Console.WriteLine($"[MyService]: {message}");
+    }
+}
+```
+
+Middleware’de servisi kullanmak:
+
+```csharp
+public class LoggingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly IMyService _service;
+
+    public LoggingMiddleware(RequestDelegate next, IMyService service)
+    {
+        _next = next;
+        _service = service;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        _service.Log($"Request: {context.Request.Method} {context.Request.Path}");
+        await _next(context);
+        _service.Log("Response tamamlandı");
+    }
+}
+```
+
+Program.cs dosyasında bağımlılığı kaydederek middleware’i kullanıma alın:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSingleton<IMyService, MyService>(); // Servis kaydı
+
+var app = builder.Build();
+
+app.UseMiddleware<LoggingMiddleware>();
+
+app.MapGet("/", () => "Merhaba DI ile Middleware!");
+
+app.Run();
+```
+
+## 5. Middleware Geliştirirken Dikkat Edilmesi Gerekenler
+
+*   **Zincir Mantığını Korumak:** `await _next(context)` çağrısını unutmayın, aksi halde zincir kırılır ve sonraki middleware çalışmaz.
+*   **Performans ve İhtiyaç Analizi:** Her middleware, ek bir iş yükü getirir. İhtiyaçlarınızı iyi analiz edin.
+*   **Global Hata Yönetimi:** Hataları yakalamak için bir try-catch bloğu ekleyebilirsiniz.
+*   **Yanıtları Manipüle Etmek:** İsteğin dönen yanıtını değiştirmek için yanıt döndükten sonra işlem yapabilirsiniz.
+
+## 6. Sonuç
+
+ASP.NET Core’da middleware, modern web uygulamalarının işleyişinde kritik bir rol oynar. İstek ve yanıt işleme sürecini yöneten bu bileşenler, uygulamanızın davranışını kontrol etmenin yanı sıra özelleştirmenin de temel yoludur. Bu yazıda middleware kavramını detaylıca ele alarak, zincirin nasıl çalıştığını, özel middleware geliştirmenin adımlarını ve C# kod örnekleriyle ASP.NET Core’un sağladığı esnekliği gördük.
+
+

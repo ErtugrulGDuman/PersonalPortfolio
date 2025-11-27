@@ -1,0 +1,66 @@
+---
+title: "Docker ile SQL Server Kurulumu ve Yönetimi"
+date: "2024-02-10"
+description: "Geliştirme ortamında Docker container üzerinde SQL Server çalıştırmak, yönetmek ve veri kalıcılığını sağlamak."
+tags: ["Docker", "SQL Server", "DevOps", "Database"]
+readTime: "4 dk"
+---
+
+# Neden Docker ile SQL Server?
+
+Geliştirme yaparken yerel makinenize SQL Server kurmak yerine Docker kullanmak birçok avantaj sağlar:
+*   **Hızlı Kurulum:** Saniyeler içinde ayağa kalkar.
+*   **İzolasyon:** Farklı projeler için farklı SQL Server sürümlerini çakışmadan çalıştırabilirsiniz.
+*   **Temizlik:** İşiniz bittiğinde container'ı silerek sisteminizi temiz tutabilirsiniz.
+
+## Kurulum Adımları
+
+### 1. İmajı Çekme
+
+Microsoft'un resmi SQL Server imajını çekelim:
+
+```bash
+docker pull mcr.microsoft.com/mssql/server:2022-latest
+```
+
+### 2. Container'ı Başlatma
+
+Aşağıdaki komut ile container'ı başlatalım. Şifrenin güçlü olması gerektiğini unutmayın!
+
+```bash
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=GucluBirSifre123!" \
+   -p 1433:1433 --name sql_server_container \
+   -d mcr.microsoft.com/mssql/server:2022-latest
+```
+
+*   `-e "ACCEPT_EULA=Y"`: Lisans sözleşmesini kabul eder.
+*   `-e "MSSQL_SA_PASSWORD=..."`: `sa` kullanıcısı için şifre belirler.
+*   `-p 1433:1433`: Host portunu container portuna bağlar.
+*   `--name`: Container'a isim verir.
+*   `-d`: Arka planda (detached) çalıştırır.
+
+### 3. Bağlantı Testi
+
+Container çalışıyor mu kontrol edelim:
+
+```bash
+docker ps
+```
+
+Artık SSMS (SQL Server Management Studio) veya Azure Data Studio ile bağlanabilirsiniz:
+*   **Server:** `localhost,1433`
+*   **User:** `sa`
+*   **Password:** `GucluBirSifre123!`
+
+## Veri Kalıcılığı (Persistence)
+
+Container silindiğinde verilerin kaybolmaması için Docker Volume kullanmalıyız:
+
+```bash
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=GucluBirSifre123!" \
+   -p 1433:1433 --name sql_server_container \
+   -v sql_data:/var/opt/mssql \
+   -d mcr.microsoft.com/mssql/server:2022-latest
+```
+
+`-v sql_data:/var/opt/mssql` parametresi, verilerin host makinede saklanmasını sağlar. Böylece container'ı silip tekrar oluştursanız bile verileriniz korunur.

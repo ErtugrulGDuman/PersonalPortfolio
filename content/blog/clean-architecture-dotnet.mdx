@@ -1,0 +1,181 @@
+---
+title: "Clean Architecture Nedir? .NET Core ile Mimari Tasarım"
+date: "2024-12-26"
+description: "Clean Architecture kavramı, avantajları, temel prensipleri ve .NET Core ile örnek bir proje yapısı."
+tags: ["Clean Architecture", ".NET Core", "Architecture", "Design Patterns"]
+readTime: "5 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/clean-architecture-nedir-net-core-ile-mimari-tasar%C4%B1m-1cd4be44869e"
+---
+
+Clean Architecture (Temiz Mimari), yazılım projelerinde esneklik, test edilebilirlik ve sürdürülebilirlik sağlayan bir mimari tasarım yaklaşımıdır. 2012 yılında Robert C. Martin (Uncle Bob) tarafından tanıtılan bu mimari, projelerin iş mantığına odaklanmasını ve bağımlılıkların doğru şekilde yönetilmesini sağlar. Bu yazıda, Clean Architecture kavramını, temel prensiplerini ve .NET Core ile nasıl uygulanacağını detaylıca ele alacağız. Ayrıca, gerçek bir proje üzerinden kod örnekleriyle birlikte temiz mimarinin pratikte nasıl uygulanabileceğini göstereceğiz.
+
+## 1. Clean Architecture Nedir?
+
+Clean Architecture, projelerdeki katmanlar arasındaki bağımlılıkları yöneten ve iş mantığının merkezde tutulmasını sağlayan bir tasarım modelidir. Temel amacı, sistemin farklı katmanlarını bağımsız hale getirip değişikliklerin daha az maliyetli aynı zamanda daha kolay uygulanabilir olmasını sağlamaktır.
+
+**Clean Architecture’ın Temel Katmanları:**
+*   **Entities (Varlıklar):** Uygulamanın iş mantığını temsil eden nesneler. Bu katman, sistemin kurallarını ve veri yapısını içerir.
+*   **Use Cases (Kullanım Senaryoları):** İş kurallarını gerçekleştiren uygulama mantığı. Entities katmanıyla etkileşime geçerek kullanıcının gereksinimlerini, isteklerini karşılar.
+*   **Interface Adapters (Arayüz Adaptörleri):** Verileri kullanıcı arayüzüne veya dış sistemlere uygun hale getiren katman. API, MVC controller veya bir hizmet adaptörü bu katmanda bulunur.
+*   **Frameworks & Drivers (Çerçeveler ve Sürücüler):** Veritabanı, UI çerçeveleri gibi harici araçlar ve servisler.
+
+**Clean Architecture’ın Katmanlar Arasındaki Bağımlılık Kuralı:**
+Bağımlılıklar yalnızca merkezden dışarı doğru akmalıdır. Yani, dış katmanlar (UI, Frameworks) iç katmanlara (Entities, Use Cases) bağımlı olabilir, ancak tam tersi geçerli değildir. Özelden genele bir yaklaşım olmalıdır.
+
+## 2. Clean Architecture’ın Avantajları
+
+*   **Test Edilebilirlik:** İş mantığı ve diğer katmanlar birbirinden bağımsız olduğu için, birimleri kolayca test edebilirsiniz.
+*   **Bağımsızlık:** İş mantığı, herhangi bir framework veya teknolojiye bağımlı değildir. Bu sayede sistem kolayca başka bir platforma taşınabilir.
+*   **Bakım Kolaylığı:** Katmanlar arasında net bir ayrım olduğu için, kodun anlaşılırlığı ve sürdürülebilirliği artar. Hata yakalama kolaylaşır.
+*   **Esneklik:** Yeni özellikler eklemek veya mevcut yapıyı değiştirmek kolaydır. Çünkü her katmanın görevi bellidir.
+*   **Tekrar Kullanılabilirlik:** İş mantığı ve kullanım senaryoları farklı projelerde tekrar kullanılabilir.
+
+## 3. Clean Architecture’ı .NET Core ile Uygulama
+
+### Adım 1: Proje Yapısını Oluşturma
+
+Temiz mimaride projeyi modüler hale getirmek için birden fazla proje kullanılır. Önerilen bir yapı şu şekilde olabilir:
+
+```text
+MyApp
+├── MyApp.Core (Entities ve Use Cases)
+├── MyApp.Application (Interface Adapters)
+├── MyApp.Infrastructure (Frameworks & Drivers)
+├── MyApp.API (Sunucu ve API)
+```
+
+### Adım 2: Entities Katmanını Oluşturma
+
+```csharp
+namespace MyApp.Core.Entities
+{
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
+    }
+}
+```
+
+### Adım 3: Use Cases Katmanını Oluşturma
+
+```csharp
+namespace MyApp.Core.UseCases
+{
+    public class CalculateDiscount
+    {
+        public decimal Execute(decimal price, decimal discountRate)
+        {
+            if (discountRate < 0 || discountRate > 1)
+                throw new ArgumentException("Invalid discount rate");
+
+            return price * (1 - discountRate);
+        }
+    }
+}
+```
+
+### Adım 4: Interface Adapters Katmanını Oluşturma
+
+```csharp
+using MyApp.Core.Entities;
+using MyApp.Core.UseCases;
+
+namespace MyApp.Application.Services
+{
+    public class ProductService
+    {
+        private readonly CalculateDiscount _calculateDiscount;
+
+        public ProductService(CalculateDiscount calculateDiscount)
+        {
+            _calculateDiscount = calculateDiscount;
+        }
+
+        public decimal GetDiscountedPrice(Product product, decimal discountRate)
+        {
+            return _calculateDiscount.Execute(product.Price, discountRate);
+        }
+    }
+}
+```
+
+### Adım 5: Infrastructure Katmanını Oluşturma
+
+```csharp
+using MyApp.Core.Entities;
+
+namespace MyApp.Infrastructure.Repositories
+{
+    public class ProductRepository
+    {
+        private readonly List<Product> _products = new();
+
+        public IEnumerable<Product> GetAllProducts() => _products;
+
+        public void AddProduct(Product product) => _products.Add(product);
+    }
+}
+```
+
+### Adım 6: API Katmanını Oluşturma
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using MyApp.Application.Services;
+using MyApp.Core.Entities;
+
+namespace MyApp.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ProductsController : ControllerBase
+    {
+        private readonly ProductService _productService;
+
+        public ProductsController(ProductService productService)
+        {
+            _productService = productService;
+        }
+
+        [HttpPost]
+        public IActionResult AddProduct([FromBody] Product product, decimal discountRate)
+        {
+            var discountedPrice = _productService.GetDiscountedPrice(product, discountRate);
+            return Ok(new { OriginalPrice = product.Price, DiscountedPrice = discountedPrice });
+        }
+    }
+}
+```
+
+### Adım 7: Katmanlar Arasında Bağımlılıkları Yönetme
+
+`Program.cs` dosyasına bağımlılıkları ekleyin:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSingleton<CalculateDiscount>();
+builder.Services.AddSingleton<ProductService>();
+
+var app = builder.Build();
+
+app.MapControllers();
+
+app.Run();
+```
+
+## 4. Clean Architecture’ın Gerçek Dünya Kullanımları
+
+*   **E-Ticaret Uygulamaları:** Sipariş yönetimi, ödeme işleme ve kullanıcı doğrulama işlemleri için katmanlı bir yapı sağlar.
+*   **Kurumsal Sistemler:** İş mantığını teknoloji bağımlılığından bağımsız hale getirerek uzun vadeli çözümler sunar.
+*   **Mikro Hizmetler:** Farklı hizmetler arasında net sınırlar oluşturarak geliştirme ve bakım süreçlerini kolaylaştırır.
+
+## 5. Sonuç
+
+Clean Architecture, yazılım projelerinde sağlam bir temel oluşturmak için mükemmel bir çözümdür. Bu yazıda, Clean Architecture’ın temel kavramlarını, avantajlarını ve .NET Core ile nasıl uygulanacağını ele aldık.
+
+Bu bilgilerle, projelerinizde esneklik, test edilebilirlik ve sürdürülebilirlik sağlayan bir mimari tasarım oluşturabilirsiniz.
+
+

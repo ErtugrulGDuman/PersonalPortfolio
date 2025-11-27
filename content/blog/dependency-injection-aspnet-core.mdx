@@ -1,0 +1,168 @@
+---
+title: "Dependency Injection (DI) ve ASP.NET Core’da Uygulamaları"
+date: "2024-11-03"
+description: "ASP.NET Core'da Dependency Injection (DI) kullanımı, avantajları ve yaşam süreleri (Singleton, Scoped, Transient)."
+tags: ["Dependency Injection", "ASP.NET Core", "Design Patterns", "Software Architecture"]
+readTime: "4 dk"
+mediumUrl: "https://medium.com/@ertugrulgokayduman/dependency-injection-di-ve-asp-net-coreda-uygulamalar%C4%B1-a78aa41ee502"
+---
+
+Dependency Injection (DI), yazılım geliştirme sürecinde bağımlılıkları yönetmek için kullanılan güçlü bir tekniktir. ASP.NET Core, DI prensibini en başından destekleyen bir framework olarak, bağımlılık yönetimini kolaylaştırır, proje ve uygulamaların genişletilebilirliğini artırır. DI, test edilebilir, sürdürülebilir ve esnek uygulamalar geliştirmenin önemli bir yoludur. Bu yazıda, DI kavramını detaylıca inceleyecek ve ASP.NET Core’da Dependency Injection kullanımını, avantajlarını, temel örnekleri ile ele alacağız.
+
+## 1. Dependency Injection Nedir?
+
+Öncelikle DI, yazılım geliştirmede bir sınıfın ihtiyacı olan bağımlılıkları dışarıdan almasını sağlayan bir tasarım desenidir. Bir sınıfın ihtiyacı olan diğer sınıflara direkt olarak başvurması yerine, bu bağımlılıklar (Dependency) sınıfa enjekte(Injection) edilir. Bu sayede, sınıf bağımlılıklarından ayrılır ve daha temiz, sağlıklı ve esnek hale gelir.
+
+Klasik bir bağımlılık yapısında, bir sınıf başka bir sınıfa doğrudan bağımlıdır. Ancak DI kullanıldığında bu bağımlılık dışarıdan (örneğin, bir IoC Container veya sınıf ile) sağlanır. Bu yaklaşımın üç temel amacı vardır:
+
+*   **Bağlantıları Azaltmak:** Kod, diğer sınıflara sıkı bir bağımlılıkla bağlanmaz.
+*   **Test Edilebilirliği Artırmak:** Mock(Taklitçi) nesneleri veya fake(Sahte) sınıflar kullanarak bağımlılıklar test edilebilir.
+*   **Kolay Değişim:** Kod değişikliklerinden etkilenme olasılığı azaltılır.
+
+## 2. Dependency Injection Türleri
+
+DI için üç temel tür bulunur:
+
+1.  **Constructor Injection:** Bağımlılıklar, sınıfın yapıcı metoduna (constructor) enjekte edilir. ASP.NET Core’da en yaygın kullanılan yöntemdir.
+2.  **Property Injection:** Bağımlılıklar, sınıfın özellikleri (properties) aracılığıyla atanır.
+3.  **Method Injection:** Bağımlılıklar, bir sınıfın metoduna parametre olarak iletilir.
+
+## 3. ASP.NET Core’da Dependency Injection Kullanımı
+
+ASP.NET Core’da DI, IoC (Inversion of Control) container yapısı ile desteklenir. IoC, nesnelerin bağımlılıklarının belirli bir container’da yönetilmesini sağlar ve ASP.NET Core’un iç yapısında bulunan `ServiceCollection` sınıfı ile bu bağımlılıklar kaydedilir. Uygulama başlatılırken, IoC container bağımlılıkları çözerek ilgili sınıflara ulaştırır, enjekte eder.
+
+### DI Kullanımı İçin Temel Kod Örneği
+
+Bir ASP.NET Core projesinde DI kullanımı için örnek bir senaryo üzerinden gidelim. Burada, bir sipariş hizmetini (`OrderService`) ve ona bağımlı bir e-posta hizmetini (`EmailService`) kullanacağız.
+
+#### 1. Servisleri Tanımlayalım
+
+`IEmailService` ve `EmailService` sınıflarını oluşturarak başlayalım:
+
+```csharp
+// IEmailService.cs
+public interface IEmailService
+{
+    void SendEmail(string to, string subject, string body);
+}
+
+// EmailService.cs
+public class EmailService : IEmailService
+{
+    public void SendEmail(string to, string subject, string body)
+    {
+        // Email gönderme işlemleri burada yapılır.
+        Console.WriteLine($"Email sent to {to} with subject {subject}");
+    }
+}
+```
+
+#### 2. OrderService Sınıfını Oluşturmak
+
+Şimdi, e-posta göndermek için `EmailService`'e ihtiyaç duyan bir `OrderService` sınıfı yazalım:
+
+```csharp
+// IOrderService.cs
+public interface IOrderService
+{
+    void ProcessOrder(string customerEmail);
+}
+
+// OrderService.cs
+public class OrderService : IOrderService
+{
+    private readonly IEmailService _emailService;
+
+    public OrderService(IEmailService emailService)
+    {
+        _emailService = emailService;
+    }
+
+    public void ProcessOrder(string customerEmail)
+    {
+        // Sipariş işleme kodları
+        Console.WriteLine("Order processed.");
+
+        // Sipariş işleminden sonra e-posta gönderimi
+        _emailService.SendEmail(customerEmail, "Order Confirmation", 
+            "Your order has been processed successfully.");
+    }
+}
+```
+
+Burada `OrderService`, `IEmailService` arayüzüne bağlıdır. Constructor injection ile `IEmailService` bağımlılığı `OrderService`’e enjekte edilmiştir.
+
+#### 3. Bağımlılıkları Kaydetme ve Kullanma
+
+DI kullanabilmek için bağımlılıkları ASP.NET Core’un IoC container’ına kaydetmeliyiz. Bu işlem `Startup.cs` (<C#5) ya da `Program.cs` (>C#6) içinde gerçekleştirilir.
+
+```csharp
+// Startup.cs veya Program.cs içinde
+public void ConfigureServices(IServiceCollection services)
+{
+    services.AddScoped<IEmailService, EmailService>();
+    services.AddScoped<IOrderService, OrderService>();
+}
+```
+
+`AddScoped` metodu ile servislerin Scoped ömrünü belirliyoruz. Böylece her HTTP isteğinde yeni bir nesne oluşturulacak.
+
+#### 4. Controller’da Kullanım
+
+Son olarak, `OrderController` içinde `IOrderService`'i dependency injection ile kullanabiliriz:
+
+```csharp
+// OrderController.cs
+[ApiController]
+[Route("api/[controller]")]
+public class OrderController : ControllerBase
+{
+    private readonly IOrderService _orderService;
+
+    public OrderController(IOrderService orderService)
+    {
+        _orderService = orderService;
+    }
+
+    [HttpPost("process")]
+    public IActionResult ProcessOrder([FromBody] string customerEmail)
+    {
+        _orderService.ProcessOrder(customerEmail);
+        return Ok("Order processed and confirmation email sent.");
+    }
+}
+```
+
+## 4. DI Yaşam Süreleri
+
+ASP.NET Core’da DI için üç temel yaşam süresi bulunur:
+
+*   **Singleton:** Uygulama süresi boyunca tek bir örnek yaratılır.
+    ```csharp
+    services.AddSingleton<TService, TImplementation>();
+    ```
+*   **Scoped:** Her HTTP isteği başına bir örnek yaratılır.
+    ```csharp
+    services.AddScoped<TService, TImplementation>();
+    ```
+*   **Transient:** Her bağımlılık isteğinde, talebinde yeni bir örnek yaratılır.
+    ```csharp
+    services.AddTransient<TService, TImplementation>();
+    ```
+
+## 5. DI’ın Avantajları ve Dezavantajları
+
+**Avantajları:**
+*   **Bağımlılıkların Merkezi Yönetimi:** Sınıflar bağımsız ve kolayca değiştirilebilir hale gelir.
+*   **Test Edilebilirlik:** Mock nesneleri ile kolayca test yapılabilir.
+*   **Genişletilebilirlik:** Yeni özellikler eklemek daha kolaydır.
+
+**Dezavantajları:**
+*   **Öğrenme Eğrisi:** Yeni başlayanlar için karmaşık olabilir.
+*   **Performans:** Çok sayıda bağımlılığın olduğu durumlarda performans kaygıları olabilir.
+
+## 6. Özet ve Sonuç
+
+Dependency Injection, ASP.NET Core ile geliştirilen projelerde bağımlılıkları yönetmek için son derece etkili bir yaklaşımdır. DI sayesinde kodun daha az bağımlı, kolay ve hızlı test edilebilir ve genişletilebilir hale gelmesi sağlanır.
+
+

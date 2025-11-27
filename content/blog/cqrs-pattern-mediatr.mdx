@@ -1,0 +1,100 @@
+---
+title: "CQRS Pattern ve MediatR Kütüphanesi"
+date: "2024-02-28"
+description: "Command Query Responsibility Segregation (CQRS) deseninin MediatR kütüphanesi ile implementasyonu ve avantajları."
+tags: ["Architecture", "CQRS", ".NET Core", "MediatR"]
+readTime: "8 dk"
+---
+
+# CQRS Nedir?
+
+CQRS (Command Query Responsibility Segregation), bir uygulamadaki okuma (Query) ve yazma (Command) işlemlerini birbirinden ayıran bir tasarım desenidir. Geleneksel mimarilerde aynı veri modeli hem okuma hem de yazma için kullanılırken, CQRS bu sorumlulukları ayırır.
+
+## Neden Kullanmalıyız?
+
+*   **Performans:** Okuma ve yazma işlemleri için farklı veritabanları veya optimizasyonlar kullanılabilir.
+*   **Ölçeklenebilirlik:** Okuma ve yazma yükleri birbirinden bağımsız olarak ölçeklenebilir.
+*   **Güvenlik:** Yazma işlemleri için daha sıkı güvenlik kuralları uygulanabilir.
+
+## MediatR ile Implementasyon
+
+.NET dünyasında CQRS uygularken en popüler kütüphanelerden biri **MediatR**'dır. MediatR, nesneler arası iletişimi (in-process messaging) kolaylaştıran bir "Mediator" desen uygulamasıdır.
+
+### Kurulum
+
+```bash
+dotnet add package MediatR
+```
+
+### Command Oluşturma
+
+```csharp
+// Command: Bir eylemi temsil eder (Create, Update, Delete)
+public class CreateProductCommand : IRequest<int>
+{
+    public string Name { get; set; }
+    public decimal Price { get; set; }
+}
+
+// Handler: Command'i işleyen sınıf
+public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, int>
+{
+    private readonly IApplicationContext _context;
+
+    public CreateProductCommandHandler(IApplicationContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<int> Handle(CreateProductCommand request, CancellationToken cancellationToken)
+    {
+        var product = new Product { Name = request.Name, Price = request.Price };
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+        return product.Id;
+    }
+}
+```
+
+### Query Oluşturma
+
+```csharp
+// Query: Veri okuma isteğini temsil eder
+public class GetProductByIdQuery : IRequest<ProductViewModel>
+{
+    public int Id { get; set; }
+}
+
+// Handler
+public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, ProductViewModel>
+{
+    // ... implementation
+}
+```
+
+### Controller Kullanımı
+
+Controller'lar artık business logic içermez, sadece ilgili Command veya Query'i MediatR'a gönderir:
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class ProductsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public ProductsController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create(CreateProductCommand command)
+    {
+        var id = await _mediator.Send(command);
+        return Ok(id);
+    }
+}
+```
+
+Bu yapı sayesinde kodunuz daha temiz, test edilebilir ve bakımı kolay hale gelir.
